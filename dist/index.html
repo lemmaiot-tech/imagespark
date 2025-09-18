@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ImageSpark - AI Product Image Generator</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✨</text></svg>">
+
+<script type="importmap">
+{
+  "imports": {
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.17.0"
+  }
+}
+</script>
+  <script type="module" crossorigin src="/assets/index--lLOslH6.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-CkaIx69c.css">
+</head>
+<body data-theme="dark">
+    <div class="container">
+        <header>
+            <h1>✨ ImageSpark</h1>
+            <p>Generate professional product images with AI</p>
+            <div class="theme-switcher">
+                <span>Dark</span>
+                <label class="switch">
+                    <input type="checkbox" id="theme-toggle">
+                    <span class="slider round"></span>
+                </label>
+                <span>Light</span>
+            </div>
+        </header>
+
+        <main>
+            <div class="controls-container">
+                <div id="original-image-container" class="card">
+                    <h2>1. Upload Your Product Image</h2>
+                    <div id="original-image-preview" class="image-preview-box">
+                        <p>Drag & Drop or Click to Upload</p>
+                    </div>
+                    <input type="file" id="file-upload" accept="image/*" class="hidden">
+                </div>
+                <div id="controls" class="card">
+                    <h2>2. Choose a Style</h2>
+                    <div id="prompt-suggestions-container">
+                        <h3>Quick Suggestions</h3>
+                        <div id="prompt-suggestions">
+                            <button class="suggestion-tag" data-prompt="A lifestyle shot of the product in a real-world setting, such as a kitchen counter or a coffee table, with soft, natural lighting." data-target-style="style-lifestyle">Lifestyle Shot</button>
+                            <button class="suggestion-tag" data-prompt="A clean, professional studio shot of the product against a solid, neutral background with bright, even lighting." data-target-style="style-studio">Studio Product Shot</button>
+                            <button class="suggestion-tag" data-prompt="The product featured against a simple, minimalist background with a focus on form and color." data-target-style="style-minimalist">Minimalist Background</button>
+                        </div>
+                    </div>
+                    <div id="style-selector">
+                        <button id="style-lifestyle" class="style-btn" data-prompt="A lifestyle shot of the product in a real-world setting, such as a kitchen counter or a coffee table, with soft, natural lighting.">
+                            <div class="style-preview">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 16 4-4 6 6 8-8"/><circle cx="10" cy="8" r="2"/><path d="M21 13V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8"/></svg>
+                            </div>
+                            <span>Lifestyle Shot</span>
+                        </button>
+                        <button id="style-studio" class="style-btn" data-prompt="A clean, professional studio shot of the product against a solid, neutral background with bright, even lighting.">
+                             <div class="style-preview">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M12 8v8"/><path d="m8.5 14 7-4"/><path d="m8.5 10 7 4"/></svg>
+                            </div>
+                            <span>Studio Product Shot</span>
+                        </button>
+                        <button id="style-minimalist" class="style-btn" data-prompt="The product featured against a simple, minimalist background with a focus on form and color.">
+                            <div class="style-preview">
+                               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M8 12h8"/></svg>
+                            </div>
+                            <span>Minimalist</span>
+                        </button>
+                         <button class="style-btn" data-prompt="The product placed on a vibrant, smooth gradient background that complements its colors.">
+                           <div class="style-preview">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><defs><linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:currentColor;stop-opacity:0.5" /><stop offset="100%" style="stop-color:currentColor;stop-opacity:1" /></linearGradient></defs><rect width="18" height="18" x="3" y="3" rx="2" fill="url(#grad1)"/></svg>
+                            </div>
+                            <span>Gradient</span>
+                        </button>
+                        <button class="style-btn" data-prompt="The product set against a dynamic, abstract pattern background featuring geometric shapes and bold colors.">
+                             <div class="style-preview">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="m3.27 6.96 8.73 5.05 8.73-5.05"/><path d="m12 22.08V12"/></svg>
+                            </div>
+                            <span>Abstract</span>
+                        </button>
+                        <button class="style-btn" data-prompt="The product displayed on a realistic textured background, like wood, marble, or concrete, to give it a tactile feel.">
+                            <div class="style-preview">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.25 2.043c.47-.235 1.03-.235 1.5 0l7.5 3.75c.47.234.75.725.75 1.245v7.924c0 .52-.28.101-.75 1.245l-7.5 3.75c-.47.235-1.03.235-1.5 0l-7.5-3.75c-.47-.234-.75-.725-.75-1.245V7.038c0-.52.28-1.01.75-1.245z"/><path d="M3.5 6.5 12 11l8.5-4.5"/><path d="M3.5 17.5 12 13l8.5 4.5"/><path d="M12 22V11"/></svg>
+                            </div>
+                           <span>Textured</span>
+                        </button>
+                        <button class="style-btn" data-prompt="A vintage, retro-style photograph of the product, with faded colors, film grain, and a nostalgic feel, as if from the 1970s.">
+                            <div class="style-preview">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="7" y1="7" x2="7.01" y2="7"></line><line x1="17" y1="17" x2="7" y2="17"></line><line x1="17" y1="7" x2="12" y2="7"></line></svg>
+                            </div>
+                            <span>Vintage</span>
+                        </button>
+                        <button class="style-btn" data-prompt="A playful cartoon or comic book illustration of the product, with bold outlines, vibrant colors, and simplified details.">
+                             <div class="style-preview">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M8 14s1.5 2 4 2 4-2 4-2"></path><line x1="9" y1="9" x2="9.01" y2="9"></line><line x1="15" y1="9" x2="15.01" y2="9"></line></svg>
+                            </div>
+                            <span>Cartoon</span>
+                        </button>
+                        <button class="style-btn" data-prompt="A hyper-realistic, photorealistic image of the product, emphasizing intricate details, textures, and lighting to make it look as real as possible.">
+                            <div class="style-preview">
+                               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                            </div>
+                            <span>Photorealistic</span>
+                        </button>
+                    </div>
+                    
+                    <div id="negative-prompt-container">
+                        <h3>3. Things to Avoid (Optional)</h3>
+                         <input type="text" id="negative-prompt-input" placeholder="e.g., text, watermarks, people">
+                    </div>
+                    
+                    <button id="generate-btn" class="cta-button" disabled>Generate</button>
+                    <p id="usage-counter" class="usage-text"></p>
+                </div>
+            </div>
+
+            <div id="results-container">
+                <div id="loader" class="hidden">
+                    <div class="spinner"></div>
+                    <p>Generating images... this may take a moment.</p>
+                </div>
+                <div id="image-gallery">
+                    <!-- Generated images will appear here -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="edit-modal" class="hidden">
+        <div class="modal-content">
+            <span id="modal-close-btn">&times;</span>
+            <div class="modal-image-container">
+                <img id="modal-image" src="" alt="Editable image">
+            </div>
+            <div class="modal-controls">
+                <h3>Edit Image</h3>
+                <div class="filter-controls">
+                    <button class="filter-btn" data-filter="brightness(1.1)">Brighten</button>
+                    <button class="filter-btn" data-filter="contrast(1.2)">Contrast</button>
+                    <button class="filter-btn" data-filter="sepia(0.5)">Sepia</button>
+                </div>
+                <div class="slider-control">
+                    <label for="saturate-slider">Saturation</label>
+                    <input type="range" id="saturate-slider" min="0" max="2" step="0.1" value="1">
+                    <span id="saturate-value">1.0</span>
+                </div>
+                <button id="reset-filters-btn">Reset Filters</button>
+                <div class="download-control">
+                  <button id="modal-download-btn" class="cta-button">Download as PNG</button>
+                  <div class="dropdown">
+                    <button id="download-options-toggle" aria-label="More download options" class="cta-button dropdown-toggle">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                        <path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>
+                      </svg>
+                    </button>
+                    <div id="download-options-menu" class="dropdown-menu hidden">
+                        <a href="#" id="download-as-jpeg">Download as JPEG</a>
+                    </div>
+                  </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="tooltip"></div>
+
+    <footer>
+        <div class="footer-content">
+            <a href="https://lemmaiot.com.ng" target="_blank" rel="noopener noreferrer" class="footer-logo-link" title="Visit LemmaIoT Cloud Solution">
+                <img src="https://lemmaiot.com.ng/assets/images/logo.png" alt="LemmaIoT Cloud Solution Logo" class="footer-logo">
+            </a>
+            <p class="footer-text">
+                Product of <a href="https://lemmaiot.com.ng" target="_blank" rel="noopener noreferrer">LemmaIoT Cloud Solution</a> to aid Nigerian Business.
+            </p>
+        </div>
+    </footer>
+
+</body>
+</html>
