@@ -6,7 +6,7 @@
 
 // Configuration for daily usage limit.
 // Easy to update: just change the value of USAGE_LIMIT.
-const USAGE_LIMIT = 3;
+const USAGE_LIMIT = 5;
 
 const STORAGE_KEY = 'imageSparkUsage';
 

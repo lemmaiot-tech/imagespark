@@ -8,10 +8,6 @@
     "build": "vite build",
     "preview": "vite preview"
   },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/your-username/imagespark.git"
-  },
   "dependencies": {
     "@google/genai": "^1.17.0"
   },

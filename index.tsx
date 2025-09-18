@@ -4,29 +4,39 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { GoogleGenAI, Modality } from '@google/genai';
+import { GoogleGenAI, Modality, GenerateContentResponse } from '@google/genai';
 import { usageManager } from './usageManager.js';
 
-// State variables
+// --- Local Storage Gallery ---
+interface GalleryItem {
+  src: string;
+  prompt: string;
+}
+// NOTE: Storing base64 images in localStorage is not scalable and can exceed storage quotas.
+// The gallery will now be session-based to prevent errors.
+
+// --- State variables ---
 let uploadedImage: {
   base64: string;
   mimeType: string;
 } | null = null;
 let selectedPrompt = '';
+let numberOfVariations = 3;
+let editHistory: string[] = [];
+let historyIndex = -1;
 
-// DOM element references
+// --- DOM element references ---
 const fileUploadInput = document.getElementById('file-upload') as HTMLInputElement;
 const generateBtn = document.getElementById('generate-btn') as HTMLButtonElement;
 const originalImagePreview = document.getElementById('original-image-preview');
 const imageGallery = document.getElementById('image-gallery');
 const loader = document.getElementById('loader');
-const styleSelector = document.getElementById('style-selector');
 const negativePromptInput = document.getElementById('negative-prompt-input') as HTMLInputElement;
 const editModal = document.getElementById('edit-modal');
 const modalCloseBtn = document.getElementById('modal-close-btn');
 const modalImage = document.getElementById('modal-image') as HTMLImageElement;
 const filterControls = document.querySelector('.filter-controls');
-const resetFiltersBtn = document.getElementById('reset-filters-btn');
+const resetFiltersBtn = document.getElementById('reset-filters-btn') as HTMLButtonElement;
 const modalDownloadBtn = document.getElementById('modal-download-btn');
 const themeToggle = document.getElementById('theme-toggle') as HTMLInputElement;
 const tooltip = document.getElementById('tooltip');
@@ -36,11 +46,80 @@ const downloadOptionsToggle = document.getElementById('download-options-toggle')
 const downloadOptionsMenu = document.getElementById('download-options-menu');
 const downloadAsJpegBtn = document.getElementById('download-as-jpeg');
 const usageCounter = document.getElementById('usage-counter');
+const variationsSlider = document.getElementById('variations-slider') as HTMLInputElement;
+const variationsValue = document.getElementById('variations-value');
+const undoBtn = document.getElementById('undo-btn') as HTMLButtonElement;
+const redoBtn = document.getElementById('redo-btn') as HTMLButtonElement;
+
+// New prompt input elements
+const promptInput = document.getElementById('prompt-input') as HTMLTextAreaElement;
+const charCounter = document.getElementById('char-counter');
+const clearPromptBtn = document.getElementById('clear-prompt-btn');
+const autoSuggestionsContainer = document.getElementById('auto-suggestions-container');
 
 
 // Initialize the Google AI client
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 const model = 'gemini-2.5-flash-image-preview';
+
+const AUTO_SUGGESTION_KEYWORDS = [
+  'photorealistic', 'hyperrealistic', '4K', '8K', 'cinematic lighting',
+  'soft lighting', 'studio lighting', 'vibrant colors', 'macro shot',
+  'detailed', 'intricate details', 'sharp focus', 'soft focus',
+  'on a marble slab', 'in a forest', 'on a wooden table', 'product photography'
+];
+
+
+/**
+ * Creates an image gallery item element.
+ * @param item The gallery item data.
+ * @returns The HTML element for the gallery item.
+ */
+function createImageElement(item: GalleryItem): HTMLElement {
+    const { src, prompt } = item;
+    const wrapper = document.createElement('div');
+    wrapper.className = 'generated-image-wrapper';
+
+    const img = new Image();
+    img.src = src;
+    img.alt = prompt;
+
+    const inlineSpinner = document.createElement('div');
+    inlineSpinner.className = 'inline-spinner-container hidden';
+    inlineSpinner.innerHTML = '<div class="spinner"></div>';
+
+    const actionsWrapper = document.createElement('div');
+    actionsWrapper.className = 'image-actions';
+
+    const editBtn = document.createElement('button');
+    editBtn.textContent = 'Edit';
+    editBtn.onclick = () => openEditModal(img.src);
+
+    const upscaleBtn = document.createElement('button');
+    upscaleBtn.textContent = 'Upscale';
+    upscaleBtn.onclick = handleUpscaleClick;
+
+    const downloadBtn = document.createElement('button');
+    downloadBtn.textContent = 'Download';
+    downloadBtn.onclick = () => {
+        const a = document.createElement('a');
+        a.href = img.src;
+        a.download = getFormattedFilename('png');
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    };
+
+    actionsWrapper.appendChild(editBtn);
+    actionsWrapper.appendChild(upscaleBtn);
+    actionsWrapper.appendChild(downloadBtn);
+
+    wrapper.appendChild(img);
+    wrapper.appendChild(inlineSpinner);
+    wrapper.appendChild(actionsWrapper);
+
+    return wrapper;
+}
 
 
 /**
@@ -58,7 +137,6 @@ function updateUsageUI() {
     generateBtn.disabled = true;
     generateBtn.textContent = 'Daily limit reached';
   } else {
-    // If limit is not reached, the button state depends on other conditions
     generateBtn.textContent = 'Generate';
     generateBtn.disabled = !uploadedImage || !selectedPrompt;
   }
@@ -82,7 +160,6 @@ function fileToGenerativePart(file: File): Promise<{ base64: string, mimeType: s
       resolve({ base64, mimeType: file.type });
     };
     reader.onerror = (error) => reject(error);
-    // Fix: Corrected typo from readDataURL to readAsDataURL.
     reader.readAsDataURL(file);
   });
 }
@@ -111,7 +188,7 @@ async function processFile(file: File) {
     } catch (error) {
       console.error("Error processing file:", error);
       uploadedImage = null;
-      generateBtn.disabled = true;
+      if (generateBtn) generateBtn.disabled = true;
       originalImagePreview.innerHTML = '<p style="color: red;">Could not process image.</p>';
     }
   }
@@ -129,15 +206,67 @@ async function handleFileChange(event: Event) {
 }
 
 /**
+ * Updates the disabled state of the undo and redo buttons based on history.
+ */
+function updateUndoRedoState() {
+    if (!undoBtn || !redoBtn) return;
+    undoBtn.disabled = historyIndex <= 0;
+    redoBtn.disabled = historyIndex >= editHistory.length - 1;
+}
+
+/**
+ * Applies the filter state from the current history index to the image and UI controls.
+ */
+function applyHistoryState() {
+    if (!modalImage || !saturateSlider || !saturateValue) return;
+
+    const currentFilter = editHistory[historyIndex];
+    modalImage.style.filter = currentFilter;
+
+    // Update the saturation slider to match the new state
+    const saturateMatch = currentFilter.match(/saturate\(([^)]+)\)/);
+    if (saturateMatch && saturateMatch[1]) {
+        const value = saturateMatch[1];
+        saturateSlider.value = value;
+        saturateValue.textContent = parseFloat(value).toFixed(1);
+    } else {
+        // If saturate is not in the filter string, reset the slider
+        saturateSlider.value = '1';
+        saturateValue.textContent = '1.0';
+    }
+
+    updateUndoRedoState();
+}
+
+/**
+ * Records a new filter state into the history.
+ * @param newFilter The new CSS filter string to record.
+ */
+function recordHistoryState(newFilter: string) {
+    // If we've undone some steps and are now making a new edit,
+    // truncate the "future" history.
+    if (historyIndex < editHistory.length - 1) {
+        editHistory = editHistory.slice(0, historyIndex + 1);
+    }
+    editHistory.push(newFilter);
+    historyIndex = editHistory.length - 1;
+    updateUndoRedoState();
+}
+
+
+/**
  * Opens the editing modal with the specified image.
  * @param imageSrc The data URL of the image to edit.
  */
 function openEditModal(imageSrc: string) {
   if (!modalImage || !editModal) return;
   modalImage.src = imageSrc;
-  modalImage.style.filter = 'none'; // Reset filters on open
-  if (saturateSlider) saturateSlider.value = '1';
-  if (saturateValue) saturateValue.textContent = '1.0';
+  
+  // Initialize edit history for the new image
+  editHistory = ['none'];
+  historyIndex = 0;
+  applyHistoryState(); // Apply initial state and update buttons
+
   editModal.classList.remove('hidden');
 }
 
@@ -162,7 +291,6 @@ function getFormattedFilename(extension: 'png' | 'jpeg'): string {
 async function downloadEditedImage(format: 'png' | 'jpeg' = 'png') {
   if (!modalImage) return;
 
-  // Hide dropdown if open
   downloadOptionsMenu?.classList.add('hidden');
 
   const canvas = document.createElement('canvas');
@@ -253,6 +381,35 @@ async function handleUpscaleClick(event: MouseEvent) {
     }
 }
 
+/**
+ * Creates a placeholder element to show while an image is generating.
+ * @returns The placeholder HTML element.
+ */
+function createPlaceholderElement(): HTMLElement {
+    const placeholder = document.createElement('div');
+    placeholder.className = 'placeholder-wrapper';
+    placeholder.innerHTML = `<div class="spinner"></div><p>Generating...</p>`;
+    return placeholder;
+}
+
+/**
+ * Updates a placeholder element to show an error state.
+ * @param placeholder The placeholder element to update.
+ * @param message The error message to display.
+ */
+function updatePlaceholderWithError(placeholder: HTMLElement, message: string): void {
+    placeholder.classList.add('error');
+    // Error Icon SVG
+    const errorIcon = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+    `;
+    placeholder.innerHTML = `${errorIcon}<p>${message}</p>`;
+}
+
 
 /**
  * Handles the generate button click event.
@@ -264,7 +421,7 @@ async function handleGenerateClick() {
     return;
   }
 
-  if (!uploadedImage || !imageGallery || !loader || !selectedPrompt) {
+  if (!uploadedImage || !imageGallery || !selectedPrompt) {
     console.error("Required elements, image data, or a prompt is missing.");
     return;
   }
@@ -276,96 +433,88 @@ async function handleGenerateClick() {
   }
 
   generateBtn.disabled = true;
-  loader.classList.remove('hidden');
-  imageGallery.innerHTML = '';
+  generateBtn.textContent = `Generating ${numberOfVariations} image${numberOfVariations > 1 ? 's' : ''}...`;
+  
+  // Record usage once per click, before starting generation.
+  usageManager.recordGeneration();
+
+  // Create and display placeholders
+  const placeholders: HTMLElement[] = [];
+  for (let i = 0; i < numberOfVariations; i++) {
+    const placeholder = createPlaceholderElement();
+    placeholders.push(placeholder);
+    imageGallery.prepend(placeholder);
+  }
 
   try {
-    const response = await ai.models.generateContent({
-      model: model,
-      contents: {
-        parts: [
-          { inlineData: { data: uploadedImage.base64, mimeType: uploadedImage.mimeType } },
-          { text: finalPrompt },
-        ],
-      },
-      config: {
-        responseModalities: [Modality.IMAGE, Modality.TEXT],
-      },
+    const generationPromises: Promise<GenerateContentResponse>[] = [];
+    for (let i = 0; i < numberOfVariations; i++) {
+        const promise = ai.models.generateContent({
+            model: model,
+            contents: {
+                parts: [
+                    { inlineData: { data: uploadedImage.base64, mimeType: uploadedImage.mimeType } },
+                    { text: finalPrompt },
+                ],
+            },
+            config: {
+                responseModalities: [Modality.IMAGE, Modality.TEXT],
+            },
+        });
+        generationPromises.push(promise);
+    }
+
+    const results = await Promise.allSettled(generationPromises);
+    let imagesGenerated = 0;
+
+    results.forEach((result, index) => {
+        const placeholder = placeholders[numberOfVariations - 1 - index]; // Process in reverse order of prepending
+        if (!placeholder) return;
+
+        if (result.status === 'fulfilled') {
+            const response = result.value;
+            const imagePart = response.candidates?.[0]?.content?.parts.find(p => p.inlineData);
+            
+            if (imagePart?.inlineData) {
+                const base64ImageBytes = imagePart.inlineData.data;
+                const mimeType = imagePart.inlineData.mimeType || 'image/png';
+                const imageUrl = `data:${mimeType};base64,${base64ImageBytes}`;
+                const galleryItem: GalleryItem = { src: imageUrl, prompt: finalPrompt };
+                
+                const imageElement = createImageElement(galleryItem);
+                placeholder.replaceWith(imageElement);
+                imagesGenerated++;
+            } else {
+                 updatePlaceholderWithError(placeholder, 'No image found.');
+            }
+        } else {
+            console.error("A generation promise failed:", result.reason);
+            updatePlaceholderWithError(placeholder, 'Generation failed.');
+        }
     });
 
-    if (response.candidates && response.candidates[0].content.parts) {
-        let imageFound = false;
-        for (const part of response.candidates[0].content.parts) {
-            if (part.inlineData) {
-                imageFound = true;
-                const base64ImageBytes = part.inlineData.data;
-                const mimeType = part.inlineData.mimeType || 'image/png';
-                const imageUrl = `data:${mimeType};base64,${base64ImageBytes}`;
-
-                const wrapper = document.createElement('div');
-                wrapper.className = 'generated-image-wrapper';
-                
-                const img = new Image();
-                img.src = imageUrl;
-                img.alt = finalPrompt;
-
-                const inlineSpinner = document.createElement('div');
-                inlineSpinner.className = 'inline-spinner-container hidden';
-                inlineSpinner.innerHTML = '<div class="spinner"></div>';
-                
-                const actionsWrapper = document.createElement('div');
-                actionsWrapper.className = 'image-actions';
-
-                const editBtn = document.createElement('button');
-                editBtn.textContent = 'Edit';
-                editBtn.onclick = () => openEditModal(img.src);
-
-                const upscaleBtn = document.createElement('button');
-                upscaleBtn.textContent = 'Upscale';
-                upscaleBtn.onclick = handleUpscaleClick;
-                
-                const downloadBtn = document.createElement('button');
-                downloadBtn.textContent = 'Download';
-                downloadBtn.onclick = (e) => {
-                    const currentWrapper = (e.currentTarget as HTMLElement).closest('.generated-image-wrapper');
-                    const currentImg = currentWrapper?.querySelector('img');
-                    if (currentImg) {
-                        const a = document.createElement('a');
-                        a.href = currentImg.src;
-                        a.download = getFormattedFilename('png');
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a);
-                    }
-                };
-                
-                actionsWrapper.appendChild(editBtn);
-                actionsWrapper.appendChild(upscaleBtn);
-                actionsWrapper.appendChild(downloadBtn);
-                
-                wrapper.appendChild(img);
-                wrapper.appendChild(inlineSpinner);
-                wrapper.appendChild(actionsWrapper);
-                imageGallery.appendChild(wrapper);
-            }
-        }
-        if (imageFound) {
-            usageManager.recordGeneration();
-        } else {
-            imageGallery.innerHTML = '<p class="gallery-message">No images were generated. Please try a different prompt or style.</p>';
-        }
-    } else {
-      imageGallery.innerHTML = '<p class="gallery-message">No content was generated. Please try again.</p>';
+    if (imagesGenerated === 0) {
+        alert("Failed to generate any images. Please try a different prompt or style.");
     }
 
   } catch (error) {
     console.error("Error generating images:", error);
-    if (imageGallery) {
-      imageGallery.innerHTML = `<p class="gallery-message error">Error: Could not generate images. Please try again.</p>`;
-    }
+    alert("An unexpected error occurred while generating images. Please try again.");
+    // Remove all placeholders on a catastrophic failure
+    placeholders.forEach(p => p.remove());
+
   } finally {
+    // Clear the uploaded image and reset the input area.
+    uploadedImage = null;
+    if (originalImagePreview) {
+        originalImagePreview.innerHTML = '<p>Drag & Drop or Click to Upload</p>';
+    }
+    if (fileUploadInput) {
+        fileUploadInput.value = '';
+    }
+
+    // Update UI state (disables button since uploadedImage is now null).
     updateUsageUI();
-    loader.classList.add('hidden');
   }
 }
 
@@ -418,13 +567,14 @@ function updateFilter(type: string, value: string) {
         .join(' ');
 
     modalImage.style.filter = newFilterStyle;
+    recordHistoryState(newFilterStyle);
 }
 
 
 // Attach event listeners once the DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-  loadTheme(); // Load theme on init
-  updateUsageUI(); // Set initial usage count and button state
+  loadTheme();
+  updateUsageUI(); 
 
   if (fileUploadInput) fileUploadInput.addEventListener('change', handleFileChange);
   if (generateBtn) generateBtn.addEventListener('click', handleGenerateClick);
@@ -432,7 +582,6 @@ document.addEventListener('DOMContentLoaded', () => {
   // Drag and drop logic
   const dropZone = document.getElementById('original-image-container');
   if (dropZone && originalImagePreview) {
-    // Prevent default browser behavior (opening file) for the whole window
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
       document.body.addEventListener(eventName, e => e.preventDefault());
     });
@@ -458,17 +607,65 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Style selector logic
-  const styleButtons = styleSelector?.querySelectorAll('.style-btn');
-  if (styleButtons && styleButtons.length > 0) {
-      styleButtons.forEach(button => {
-          button.addEventListener('click', () => {
-              styleButtons.forEach(btn => btn.classList.remove('active'));
-              button.classList.add('active');
-              selectedPrompt = (button as HTMLButtonElement).dataset.prompt || '';
-              updateUsageUI();
-          });
+  // --- Prompt Input Logic ---
+  if (promptInput && charCounter && clearPromptBtn && autoSuggestionsContainer) {
+      promptInput.addEventListener('input', () => {
+          const prompt = promptInput.value;
+          const length = prompt.length;
+          const maxLength = promptInput.maxLength;
 
+          selectedPrompt = prompt.trim();
+          charCounter.textContent = `${length} / ${maxLength}`;
+          updateUsageUI();
+          
+          // Auto-suggestions
+          autoSuggestionsContainer.innerHTML = '';
+          const currentWords = prompt.split(/\s+/);
+          const lastWord = currentWords[currentWords.length - 1].toLowerCase();
+
+          if (lastWord.length > 1) {
+              const suggestions = AUTO_SUGGESTION_KEYWORDS.filter(keyword => 
+                  keyword.startsWith(lastWord) && !prompt.toLowerCase().includes(keyword)
+              ).slice(0, 5); // Limit to 5 suggestions
+
+              suggestions.forEach(suggestion => {
+                  const tag = document.createElement('button');
+                  tag.className = 'suggestion-tag';
+                  tag.textContent = suggestion;
+                  tag.onclick = () => {
+                      // Replace the last partial word with the full suggestion
+                      currentWords[currentWords.length - 1] = suggestion;
+                      promptInput.value = currentWords.join(' ') + ' ';
+                      promptInput.focus();
+                      // Trigger input event to update everything
+                      promptInput.dispatchEvent(new Event('input', { bubbles: true }));
+                  };
+                  autoSuggestionsContainer.appendChild(tag);
+              });
+          }
+      });
+      
+      clearPromptBtn.addEventListener('click', () => {
+          promptInput.value = '';
+          // Trigger input event to update everything
+          promptInput.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+  }
+
+  // Style starter buttons logic
+  const styleStarterBtns = document.querySelectorAll('#style-starters .style-btn');
+  if (styleStarterBtns.length > 0) {
+      styleStarterBtns.forEach(button => {
+          button.addEventListener('click', () => {
+              if (promptInput) {
+                  const promptText = (button as HTMLButtonElement).dataset.prompt || '';
+                  promptInput.value = promptText;
+                  // Trigger input event to update character count, suggestions, etc.
+                  promptInput.dispatchEvent(new Event('input', { bubbles: true }));
+                  promptInput.focus();
+              }
+          });
+          
           // Tooltip logic
           if (tooltip) {
             button.addEventListener('mouseenter', (e) => {
@@ -479,7 +676,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 tooltip.textContent = promptText;
                 
                 const rect = target.getBoundingClientRect();
-                tooltip.style.top = `${rect.top - 8}px`; // 8px spacing above
+                tooltip.style.top = `${rect.top - 8}px`; 
                 tooltip.style.left = `${rect.left + rect.width / 2}px`;
                 tooltip.classList.add('visible');
             });
@@ -490,29 +687,14 @@ document.addEventListener('DOMContentLoaded', () => {
           }
       });
   }
-
-  // Quick suggestions logic
-  const suggestionTags = document.querySelectorAll('.suggestion-tag');
-  suggestionTags.forEach(tag => {
-      tag.addEventListener('click', () => {
-          const prompt = (tag as HTMLElement).dataset.prompt;
-          const targetStyleId = (tag as HTMLElement).dataset.targetStyle;
-          
-          if (prompt) {
-              selectedPrompt = prompt;
-          }
-
-          if (styleButtons) {
-              styleButtons.forEach(btn => btn.classList.remove('active'));
-              if (targetStyleId) {
-                  const targetButton = document.getElementById(targetStyleId);
-                  targetButton?.classList.add('active');
-              }
-          }
-          
-          updateUsageUI();
-      });
-  });
+  
+  // Variations slider logic
+  if (variationsSlider && variationsValue) {
+    variationsSlider.addEventListener('input', () => {
+        numberOfVariations = parseInt(variationsSlider.value, 10);
+        variationsValue.textContent = variationsSlider.value;
+    });
+  }
 
   // Modal logic
   modalCloseBtn?.addEventListener('click', () => editModal?.classList.add('hidden'));
@@ -541,9 +723,24 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   resetFiltersBtn?.addEventListener('click', () => {
-      if (modalImage) modalImage.style.filter = 'none';
-      if (saturateSlider) saturateSlider.value = '1';
-      if (saturateValue) saturateValue.textContent = '1.0';
+      // Re-initialize the history to its original state for this session, clearing the stack.
+      editHistory = ['none'];
+      historyIndex = 0;
+      applyHistoryState(); // This applies the 'none' filter and updates UI
+  });
+  
+  undoBtn?.addEventListener('click', () => {
+      if (historyIndex > 0) {
+          historyIndex--;
+          applyHistoryState();
+      }
+  });
+
+  redoBtn?.addEventListener('click', () => {
+      if (historyIndex < editHistory.length - 1) {
+          historyIndex++;
+          applyHistoryState();
+      }
   });
 
   // Modal download logic

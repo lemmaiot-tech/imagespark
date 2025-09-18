@@ -232,16 +232,57 @@ input:checked+.slider:before {
     gap: 1.5rem;
 }
 
-/* Prompt Suggestions */
-#prompt-suggestions-container {
-    margin-top: -0.5rem;
+/* --- New Prompt Input Area --- */
+#prompt-input {
+    width: 100%;
+    min-height: 100px;
+    padding: 10px 12px;
+    border-radius: var(--border-radius);
+    border: 1px solid var(--input-border-color);
+    background-color: var(--input-bg-color);
+    color: var(--text-color);
+    font-size: 1rem;
+    font-family: var(--font-family);
+    transition: border-color var(--transition-speed), box-shadow var(--transition-speed);
+    resize: vertical;
 }
 
-#prompt-suggestions {
+#prompt-input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px rgba(8, 8, 245, 0.25);
+}
+
+.prompt-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 8px;
+}
+
+#char-counter {
+    font-size: 0.85rem;
+    color: var(--text-color-secondary);
+}
+
+.text-button {
+    background: none;
+    border: none;
+    color: var(--accent-color);
+    cursor: pointer;
+    font-size: 0.85rem;
+    padding: 4px;
+}
+
+.text-button:hover {
+    text-decoration: underline;
+}
+
+#auto-suggestions-container {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-    margin-top: 0.5rem;
+    margin-top: -1.25rem; /* Pull up to reduce space */
 }
 
 .suggestion-tag {
@@ -260,11 +301,10 @@ input:checked+.slider:before {
     border-color: var(--accent-color);
 }
 
-
-/* Style Selector */
-#style-selector {
+/* Style Starters */
+#style-starters {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
     gap: 12px;
 }
 
@@ -286,8 +326,8 @@ input:checked+.slider:before {
 }
 
 .style-preview {
-    width: 48px;
-    height: 48px;
+    width: 40px;
+    height: 40px;
     border-radius: calc(var(--border-radius) / 2);
     display: flex;
     align-items: center;
@@ -297,24 +337,25 @@ input:checked+.slider:before {
     transition: all var(--transition-speed);
 }
 .style-preview svg {
-    width: 24px;
-    height: 24px;
+    width: 20px;
+    height: 20px;
     stroke: var(--text-color-secondary);
     transition: stroke var(--transition-speed);
 }
 
-.style-btn:hover, .style-btn.active {
+.style-btn:hover {
     color: var(--text-color);
     border-color: var(--accent-color);
     background-color: rgba(8, 8, 245, 0.1);
 }
-.style-btn:hover .style-preview, .style-btn.active .style-preview {
+.style-btn:hover .style-preview {
     border-color: var(--accent-color);
 }
 
-.style-btn:hover .style-preview svg, .style-btn.active .style-preview svg {
+.style-btn:hover .style-preview svg {
     stroke: var(--accent-color);
 }
+
 
 /* Negative Prompt Input */
 #negative-prompt-input {
@@ -354,11 +395,12 @@ input:checked+.slider:before {
     transform: translateY(-2px);
 }
 
-.cta-button:disabled {
+.cta-button:disabled, .action-button:disabled {
     background-color: #555;
     color: #999;
     cursor: not-allowed;
     transform: none;
+    opacity: 0.6;
 }
 
 .usage-text {
@@ -413,6 +455,7 @@ input:checked+.slider:before {
     border-radius: var(--border-radius);
     box-shadow: 0 4px 12px var(--shadow-color);
     aspect-ratio: 1 / 1;
+    animation: fadeIn 0.5s ease-out;
 }
 
 .generated-image-wrapper img {
@@ -498,6 +541,47 @@ input:checked+.slider:before {
     border-color: var(--cta-bg-color);
 }
 
+/* Placeholder for generating images */
+.placeholder-wrapper {
+    position: relative;
+    border: 2px dashed var(--border-color);
+    border-radius: var(--border-radius);
+    background-color: rgba(128, 128, 128, 0.05);
+    aspect-ratio: 1 / 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 0.8rem;
+    color: var(--text-color-secondary);
+    font-size: 0.9rem;
+    transition: all var(--transition-speed);
+}
+
+.placeholder-wrapper .spinner {
+    width: 30px;
+    height: 30px;
+    border-width: 4px;
+}
+.placeholder-wrapper p {
+    margin-bottom: 0;
+}
+
+.placeholder-wrapper.error {
+    border-color: var(--cta-bg-color);
+    color: var(--cta-bg-color);
+    background-color: rgba(255, 51, 102, 0.05);
+}
+
+.placeholder-wrapper.error .spinner {
+    display: none;
+}
+.placeholder-wrapper.error svg {
+    width: 32px;
+    height: 32px;
+    stroke: var(--cta-bg-color);
+}
+
 
 /* Edit Modal */
 #edit-modal {
@@ -575,7 +659,7 @@ input:checked+.slider:before {
     grid-template-columns: 1fr 1fr;
     gap: 10px;
 }
-.filter-btn, #reset-filters-btn {
+.filter-btn {
     width: 100%;
     padding: 10px;
     background-color: var(--input-bg-color);
@@ -585,7 +669,24 @@ input:checked+.slider:before {
     cursor: pointer;
     transition: background-color var(--transition-speed), border-color var(--transition-speed);
 }
-.filter-btn:hover, #reset-filters-btn:hover {
+.filter-btn:hover {
+    background-color: var(--bg-color);
+    border-color: var(--accent-color);
+}
+.action-buttons-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+}
+.action-button {
+    background-color: var(--input-bg-color);
+    color: var(--text-color);
+    border: 1px solid var(--input-border-color);
+    transition: background-color var(--transition-speed), border-color var(--transition-speed);
+    font-size: 0.9rem;
+    padding: 10px;
+}
+.action-button:hover:not(:disabled) {
     background-color: var(--bg-color);
     border-color: var(--accent-color);
 }
@@ -647,6 +748,7 @@ input[type="range"]::-moz-range-thumb {
 .download-control {
     display: flex;
     width: 100%;
+    margin-top: auto; /* Pushes download to the bottom */
 }
 
 .download-control .cta-button {
