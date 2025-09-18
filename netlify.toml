@@ -11,9 +11,8 @@
   # recommended to set them in the Netlify UI instead)
   # GEMINI_API_KEY = ""
 
-[redirects]
-  # catch-all to support SPA routing (serve index.html for client routes)
-  [[redirects]]
-    from = "/*"
-    to = "/index.html"
-    status = 200
+# Catch-all redirect to support SPA routing (serve index.html for client routes)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
