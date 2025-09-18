@@ -27,6 +27,7 @@ let historyIndex = -1;
 
 // --- DOM element references ---
 const fileUploadInput = document.getElementById('file-upload') as HTMLInputElement;
+const uploadBtn = document.getElementById('upload-btn') as HTMLButtonElement;
 const generateBtn = document.getElementById('generate-btn') as HTMLButtonElement;
 const originalImagePreview = document.getElementById('original-image-preview');
 const imageGallery = document.getElementById('image-gallery');
@@ -68,6 +69,65 @@ const AUTO_SUGGESTION_KEYWORDS = [
   'detailed', 'intricate details', 'sharp focus', 'soft focus',
   'on a marble slab', 'in a forest', 'on a wooden table', 'product photography'
 ];
+
+
+/**
+ * Handles the upscaling of a generated image.
+ * @param event The mouse event from the upscale button click.
+ */
+async function handleUpscaleClick(event: MouseEvent) {
+    const target = event.currentTarget as HTMLButtonElement;
+    const wrapper = target.closest('.generated-image-wrapper');
+    if (!wrapper) return;
+    
+    const img = wrapper.querySelector('img');
+    const spinner = wrapper.querySelector('.inline-spinner-container');
+    if (!img || !spinner) return;
+
+    target.disabled = true;
+    target.textContent = 'Upscaling...';
+    spinner.classList.remove('hidden');
+
+    try {
+        const originalSrc = img.src;
+        const [header, base64Data] = originalSrc.split(',');
+        if (!header || !base64Data) {
+            throw new Error('Invalid image data URL.');
+        }
+        const mimeType = header.match(/:(.*?);/)?.[1] || 'image/png';
+
+        const response = await ai.models.generateContent({
+            model: model,
+            contents: {
+                parts: [
+                    { inlineData: { data: base64Data, mimeType: mimeType } },
+                    { text: 'Upscale this image, significantly increasing its resolution and enhancing details for high-quality printing. Maintain the original composition and style.' }
+                ],
+            },
+            config: {
+                responseModalities: [Modality.IMAGE, Modality.TEXT],
+            },
+        });
+
+        const imagePart = response.candidates?.[0]?.content?.parts.find(p => p.inlineData);
+        if (imagePart?.inlineData) {
+            const newBase64 = imagePart.inlineData.data;
+            const newMimeType = imagePart.inlineData.mimeType || 'image/png';
+            img.src = `data:${newMimeType};base64,${newBase64}`;
+            target.textContent = 'Upscaled';
+        } else {
+            throw new Error('Upscaled image not found in response.');
+        }
+
+    } catch (error) {
+        console.error("Error upscaling image:", error);
+        alert("Failed to upscale image. Please try again.");
+        target.disabled = false;
+        target.textContent = 'Upscale';
+    } finally {
+        spinner.classList.add('hidden');
+    }
+}
 
 
 /**
@@ -175,12 +235,17 @@ async function processFile(file: File) {
     return;
   }
   
+  const uploadInstructions = originalImagePreview?.querySelector('.upload-instructions');
+
   if (originalImagePreview) {
     const previewImg = document.createElement('img');
     previewImg.src = URL.createObjectURL(file);
     previewImg.onload = () => URL.revokeObjectURL(previewImg.src);
-    originalImagePreview.innerHTML = '';
-    originalImagePreview.appendChild(previewImg);
+    
+    if (uploadInstructions) {
+        originalImagePreview.innerHTML = '';
+        originalImagePreview.appendChild(previewImg);
+    }
 
     try {
       uploadedImage = await fileToGenerativePart(file);
@@ -189,7 +254,13 @@ async function processFile(file: File) {
       console.error("Error processing file:", error);
       uploadedImage = null;
       if (generateBtn) generateBtn.disabled = true;
-      originalImagePreview.innerHTML = '<p style="color: red;">Could not process image.</p>';
+      if (uploadInstructions) {
+        originalImagePreview.innerHTML = '';
+        originalImagePreview.appendChild(uploadInstructions);
+        const p = originalImagePreview.querySelector('p');
+        if (p) p.style.color = 'red';
+        if (p) p.textContent = 'Could not process image.';
+      }
     }
   }
 }
@@ -324,64 +395,6 @@ async function downloadEditedImage(format: 'png' | 'jpeg' = 'png') {
 
 
 /**
- * Handles the upscaling of a generated image.
- * @param event The mouse event from the upscale button click.
- */
-async function handleUpscaleClick(event: MouseEvent) {
-    const target = event.currentTarget as HTMLButtonElement;
-    const wrapper = target.closest('.generated-image-wrapper');
-    if (!wrapper) return;
-    
-    const img = wrapper.querySelector('img');
-    const spinner = wrapper.querySelector('.inline-spinner-container');
-    if (!img || !spinner) return;
-
-    target.disabled = true;
-    target.textContent = 'Upscaling...';
-    spinner.classList.remove('hidden');
-
-    try {
-        const originalSrc = img.src;
-        const [header, base64Data] = originalSrc.split(',');
-        if (!header || !base64Data) {
-            throw new Error('Invalid image data URL.');
-        }
-        const mimeType = header.match(/:(.*?);/)?.[1] || 'image/png';
-
-        const response = await ai.models.generateContent({
-            model: model,
-            contents: {
-                parts: [
-                    { inlineData: { data: base64Data, mimeType: mimeType } },
-                    { text: 'Upscale this image, significantly increasing its resolution and enhancing details for high-quality printing. Maintain the original composition and style.' }
-                ],
-            },
-            config: {
-                responseModalities: [Modality.IMAGE, Modality.TEXT],
-            },
-        });
-
-        const imagePart = response.candidates?.[0]?.content?.parts.find(p => p.inlineData);
-        if (imagePart?.inlineData) {
-            const newBase64 = imagePart.inlineData.data;
-            const newMimeType = imagePart.inlineData.mimeType || 'image/png';
-            img.src = `data:${newMimeType};base64,${newBase64}`;
-            target.textContent = 'Upscaled';
-        } else {
-            throw new Error('Upscaled image not found in response.');
-        }
-
-    } catch (error) {
-        console.error("Error upscaling image:", error);
-        alert("Failed to upscale image. Please try again.");
-        target.disabled = false;
-        target.textContent = 'Upscale';
-    } finally {
-        spinner.classList.add('hidden');
-    }
-}
-
-/**
  * Creates a placeholder element to show while an image is generating.
  * @returns The placeholder HTML element.
  */
@@ -507,7 +520,17 @@ async function handleGenerateClick() {
     // Clear the uploaded image and reset the input area.
     uploadedImage = null;
     if (originalImagePreview) {
-        originalImagePreview.innerHTML = '<p>Drag & Drop or Click to Upload</p>';
+      const uploadInstructions = `
+        <div class="upload-instructions">
+          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+          <p>Drag & drop an image here</p>
+          <span class="upload-or">or</span>
+          <button id="upload-btn" class="action-button">Select Image</button>
+        </div>`;
+      originalImagePreview.innerHTML = uploadInstructions;
+      // Re-add event listener to the new button
+      const newUploadBtn = document.getElementById('upload-btn');
+      newUploadBtn?.addEventListener('click', () => fileUploadInput?.click());
     }
     if (fileUploadInput) {
         fileUploadInput.value = '';
@@ -577,10 +600,11 @@ document.addEventListener('DOMContentLoaded', () => {
   updateUsageUI(); 
 
   if (fileUploadInput) fileUploadInput.addEventListener('change', handleFileChange);
+  if (uploadBtn) uploadBtn.addEventListener('click', () => fileUploadInput.click());
   if (generateBtn) generateBtn.addEventListener('click', handleGenerateClick);
 
   // Drag and drop logic
-  const dropZone = document.getElementById('original-image-container');
+  const dropZone = document.getElementById('original-image-preview');
   if (dropZone && originalImagePreview) {
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
       document.body.addEventListener(eventName, e => e.preventDefault());
@@ -599,6 +623,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     dropZone.addEventListener('drop', async (e: DragEvent) => {
+      e.preventDefault();
+      originalImagePreview.classList.remove('drag-over');
       const droppedFiles = e.dataTransfer?.files;
       if (droppedFiles && droppedFiles.length > 0) {
         if (fileUploadInput) fileUploadInput.files = droppedFiles;
