@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ImageSpark - AI Product Image Generator</title>
     <link rel="stylesheet" href="index.css">
-    <link rel="icon" href="https://lemmaiot.com.ng/assets/images/fav.png" type="image/png">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✨</text></svg>">
 <script type="importmap">
 {
   "imports": {
@@ -20,6 +20,14 @@
         <header>
             <h1>✨ ImageSpark</h1>
             <p>Generate professional product images with AI</p>
+            <div class="header-actions">
+                <button id="history-btn" class="action-button header-btn">History</button>
+                <div id="account-info" class="hidden">
+                    <span id="user-email"></span>
+                    <button id="logout-btn" class="text-button">Log Out</button>
+                </div>
+                <button id="login-prompt-btn" class="action-button header-btn">Log In</button>
+            </div>
             <div class="theme-switcher">
                 <span>Dark</span>
                 <label class="switch">
@@ -120,16 +128,105 @@
                         </div>
                     </div>
 
+                    <div id="artistic-style-container">
+                        <h3>5. Artistic Style</h3>
+                        <div id="artistic-style-selector">
+                            <button class="style-select-btn active" data-style="">None</button>
+                            <button class="style-select-btn" data-style="in a photorealistic style">Photorealistic</button>
+                            <button class="style-select-btn" data-style="in a vibrant cartoon style">Cartoon</button>
+                            <button class="style-select-btn" data-style="as a detailed oil painting">Oil Painting</button>
+                            <button class="style-select-btn" data-style="as a soft watercolor painting">Watercolor</button>
+                            <button class="style-select-btn" data-style="as a clean line art drawing">Line Art</button>
+                        </div>
+                    </div>
+
+                    <div id="aspect-ratio-container">
+                        <h3>6. Aspect Ratio</h3>
+                        <div id="aspect-ratio-selector">
+                            <button class="aspect-ratio-btn active" data-ratio="1:1" aria-label="Social Media Post (1:1)">
+                                <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"></rect></svg>
+                                <span>Post (1:1)</span>
+                            </button>
+                            <button class="aspect-ratio-btn" data-ratio="4:5" aria-label="Portrait Post (4:5)">
+                                <svg viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"></rect></svg>
+                                <span>Portrait (4:5)</span>
+                            </button>
+                            <button class="aspect-ratio-btn" data-ratio="3:4" aria-label="Tall Portrait (3:4)">
+                                <svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"></rect></svg>
+                                <span>Tall (3:4)</span>
+                            </button>
+                            <button class="aspect-ratio-btn" data-ratio="9:16" aria-label="Story or Reel (9:16)">
+                                <svg viewBox="0 0 24 24"><rect x="6.5" y="2" width="11" height="20" rx="2"></rect></svg>
+                                <span>Story (9:16)</span>
+                            </button>
+                            <button class="aspect-ratio-btn" data-ratio="16:9" aria-label="Landscape Banner (16:9)">
+                                <svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"></rect></svg>
+                                <span>Banner (16:9)</span>
+                            </button>
+                        </div>
+                    </div>
+
+
                     <button id="generate-btn" class="cta-button" disabled>Generate</button>
                     <p id="usage-counter" class="usage-text"></p>
                 </div>
             </div>
 
-            <div id="results-container">
-                <div id="loader" class="hidden">
-                    <div class="spinner"></div>
-                    <p>Generating images... this may take a moment.</p>
+            <div id="image-toolkit-container" class="card hidden">
+                <div class="toolkit-header">
+                    <h2>Image Toolkit</h2>
+                    <p>Apply a special effect to your uploaded image before generating variations.</p>
                 </div>
+                <div class="toolkit-main">
+                    <div id="toolkit-controls">
+                        <button id="magic-remover-btn" class="toolkit-btn" disabled>
+                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.5 2.5a2.5 2.5 0 0 1 3.5 3.5L8.5 17.5a2.5 2.5 0 0 1-3.5-3.5Z"/><path d="M12.5 7.5 16.5 11.5"/></svg>
+                            <span>Magic Remover</span>
+                        </button>
+                        <button id="blueprintify-btn" class="toolkit-btn" disabled>
+                           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+                            <span>Blueprint-ify</span>
+                        </button>
+                         <button id="scene-creator-btn" class="toolkit-btn" disabled>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                            <span>Scene Creator</span>
+                        </button>
+                        <button id="copy-effect-btn" class="toolkit-btn" disabled>
+                           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="9" height="9" x="9" y="9" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                           <span>Copy Effect</span>
+                        </button>
+                        <input type="file" id="style-file-upload" accept="image/*" class="hidden">
+                        <div id="composition-grid-control">
+                            <button id="composition-grid-btn" class="toolkit-btn" disabled>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/></svg>
+                                <span>Composition Grid</span>
+                            </button>
+                            <div class="slider-control hidden" id="grid-size-control">
+                                <label for="grid-size-slider">Grid Size</label>
+                                <input type="range" id="grid-size-slider" min="2" max="5" step="1" value="3">
+                                <span id="grid-size-value">3x3</span>
+                            </div>
+                            <div class="slider-control hidden" id="grid-thickness-control">
+                                <label for="grid-thickness-slider">Thickness</label>
+                                <input type="range" id="grid-thickness-slider" min="1" max="10" step="1" value="2">
+                                <span id="grid-thickness-value">2px</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="toolkit-preview-container">
+                        <div class="placeholder">
+                             <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+                            <span>Toolkit results will appear here</span>
+                        </div>
+                        <img id="toolkit-preview-img" class="hidden" alt="Toolkit preview">
+                    </div>
+                    <div id="toolkit-actions">
+                        <button id="toolkit-download-btn" class="action-button" disabled>Download Result</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="results-container">
                 <div id="image-gallery">
                     <!-- Generated images will appear here -->
                 </div>
@@ -142,23 +239,70 @@
             <span id="modal-close-btn">&times;</span>
             <div class="modal-image-container">
                 <img id="modal-image" src="" alt="Editable image">
+                <img id="modal-image-filtered" src="" alt="Filtered image layer">
+                <canvas id="mask-canvas"></canvas>
             </div>
             <div class="modal-controls">
                 <h3>Edit Image</h3>
+                <div class="ai-edit-controls">
+                    <div class="section-header">
+                        <h4>AI-Powered Editing</h4>
+                    </div>
+                    <textarea id="ai-edit-prompt" placeholder="Describe your edit, e.g., 'Add a retro filter' or 'Make the background blurry'"></textarea>
+                    <button id="ai-edit-generate-btn" class="action-button" disabled>Apply AI Edit</button>
+                </div>
+                <div class="mask-controls">
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="enable-mask-drawing">
+                        <span class="toggle-slider"></span>
+                        <span>Enable Mask Drawing</span>
+                    </label>
+                    <div class="slider-control hidden" id="brush-size-control">
+                        <label for="brush-size-slider">Brush</label>
+                        <input type="range" id="brush-size-slider" min="5" max="50" step="1" value="20">
+                        <span id="brush-size-value">20</span>
+                    </div>
+                    <div class="action-buttons-group hidden" id="mask-buttons">
+                         <button id="clear-mask-btn" class="action-button">Clear Mask</button>
+                    </div>
+                </div>
+
                 <div class="filter-controls">
-                    <button class="filter-btn" data-filter="brightness(1.1)">Brighten</button>
-                    <button class="filter-btn" data-filter="contrast(1.2)">Contrast</button>
-                    <button class="filter-btn" data-filter="sepia(0.5)">Sepia</button>
+                    <div class="section-header">
+                        <h4>Adjustments</h4>
+                        <button id="reset-adjustments-btn" class="text-button">Reset</button>
+                    </div>
+                    <div class="slider-control">
+                        <label for="brightness-slider">Brightness</label>
+                        <input type="range" id="brightness-slider" min="0" max="2" step="0.1" value="1">
+                        <span id="brightness-value">1.0</span>
+                    </div>
+                    <div class="slider-control">
+                        <label for="contrast-slider">Contrast</label>
+                        <input type="range" id="contrast-slider" min="0" max="2" step="0.1" value="1">
+                        <span id="contrast-value">1.0</span>
+                    </div>
+                    <div class="slider-control">
+                        <label for="saturate-slider">Saturation</label>
+                        <input type="range" id="saturate-slider" min="0" max="2" step="0.1" value="1">
+                        <span id="saturate-value">1.0</span>
+                    </div>
+                    
+                    <div class="section-header">
+                        <h4>Predefined Filters</h4>
+                        <button id="reset-filters-btn" class="text-button">Reset</button>
+                    </div>
+                    <div class="filters-group">
+                        <button class="filter-btn" data-filter="sepia(0.8)">Sepia</button>
+                        <button class="filter-btn" data-filter="grayscale(1)">B&W</button>
+                        <button class="filter-btn" data-filter="sepia(0.6) contrast(1.1) brightness(0.9) saturate(1.2) hue-rotate(-10deg)">Vintage</button>
+                    </div>
                 </div>
-                <div class="slider-control">
-                    <label for="saturate-slider">Saturation</label>
-                    <input type="range" id="saturate-slider" min="0" max="2" step="0.1" value="1">
-                    <span id="saturate-value">1.0</span>
-                </div>
+                
                 <div class="action-buttons-group">
                     <button id="undo-btn" class="action-button">Undo</button>
                     <button id="redo-btn" class="action-button">Redo</button>
-                    <button id="reset-filters-btn" class="action-button">Reset</button>
+                    <button id="reset-all-btn" class="action-button">Reset All</button>
                 </div>
                 <div class="download-control">
                   <button id="modal-download-btn" class="cta-button">Download as PNG</button>
@@ -176,7 +320,64 @@
             </div>
         </div>
     </div>
+
+    <div id="history-modal" class="hidden">
+        <div class="modal-content wide">
+            <span id="history-modal-close-btn" class="modal-close-btn">&times;</span>
+            <div class="modal-header">
+                <h2>Generation History</h2>
+                <button id="clear-history-btn" class="action-button">Clear History</button>
+            </div>
+            <div id="history-gallery">
+                <!-- History items will be injected here -->
+            </div>
+        </div>
+    </div>
     
+    <div id="scene-creator-modal" class="hidden">
+        <div class="modal-content">
+            <span id="scene-creator-modal-close-btn" class="modal-close-btn">&times;</span>
+            <div class="scene-creator-container">
+                <div class="scene-creator-input">
+                    <h3>Your Product</h3>
+                    <div class="scene-creator-image-preview">
+                        <img id="scene-creator-product-img" src="" alt="Your uploaded product">
+                    </div>
+                </div>
+                <div class="scene-creator-output">
+                    <h3>Describe the Scene</h3>
+                    <textarea id="scene-creator-prompt" placeholder="e.g., On a rustic wooden kitchen table, bathed in morning sunlight..."></textarea>
+                    <button id="scene-creator-generate-btn" class="cta-button" disabled>Generate Scene</button>
+                    <div id="scene-creator-result-container">
+                        <div class="placeholder">
+                             <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+                            <span>Generated scene will appear here</span>
+                        </div>
+                        <img id="scene-creator-result-img" class="hidden" alt="Generated scene">
+                    </div>
+                    <div id="scene-creator-actions" class="hidden">
+                        <button id="scene-creator-use-btn" class="action-button">Use This Image</button>
+                        <button id="scene-creator-download-btn" class="action-button">Download</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="account-modal" class="hidden">
+        <div class="modal-content narrow">
+            <span id="account-modal-close-btn" class="modal-close-btn">&times;</span>
+            <h3>Join ImageSpark</h3>
+            <p>Create an account to start generating images and save your history.</p>
+            <form id="login-form">
+                <label for="email-input">Email Address</label>
+                <input type="email" id="email-input" placeholder="you@example.com" required>
+                <button type="submit" id="login-btn" class="cta-button">Continue with Email</button>
+            </form>
+        </div>
+    </div>
+
+
     <div id="tooltip"></div>
 
     <footer>
@@ -185,7 +386,7 @@
                 <img src="https://lemmaiot.com.ng/assets/images/logo.png" alt="LemmaIoT Cloud Solution Logo" class="footer-logo">
             </a>
             <p class="footer-text">
-                Product of <a href="https://lemmaiot.com.ng" target="_blank" rel="noopener noreferrer"><b>LemmaIoT Cloud Solution</b></a> to aid Nigerian Business.
+                Product of <a href="https://lemmaiot.com.ng" target="_blank" rel="noopener noreferrer">LemmaIoT Cloud Solution</a> to aid Nigerian Business.
             </p>
         </div>
     </footer>
