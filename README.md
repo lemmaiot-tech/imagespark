@@ -2,7 +2,7 @@
 
 This contains everything you need to run your app locally.
 
-View your app in AI Studio: https://ai.studio/apps/drive/1OpxpfVlnqC8-81yH3G_ksjLw2wre_lZO
+View your app in AI Studio: https://i-spark.neka.ng
 
 ## Run Locally
 
