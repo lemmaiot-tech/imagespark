@@ -39,196 +39,242 @@
         </header>
 
         <main>
-            <div class="controls-container">
+            <div id="use-case-selector" class="card">
+                <h2>How can I help you today?</h2>
+                <div class="use-case-buttons">
+                    <button class="use-case-btn active" data-workflow="place-in-scene">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                        <h3>Place in New Scene</h3>
+                        <p>Upload a product and place it in a custom background.</p>
+                    </button>
+                    <button class="use-case-btn" data-workflow="create-from-scratch">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.232 5.232a3 3 0 0 1 4.243 4.243L7.5 21.5 2 22l.5-5.5Z"/><path d="M18 9l-3.5-3.5"/></svg>
+                        <h3>Create from Scratch</h3>
+                        <p>Generate a new product image from a text description.</p>
+                    </button>
+                    <button class="use-case-btn" data-workflow="ai-retouch">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.5 2.5a2.5 2.5 0 0 1 3.5 3.5L8.5 17.5a2.5 2.5 0 0 1-3.5-3.5Z"/><path d="m21.5 11.5-1.9-1.9M11.5 21.5l-1.9-1.9"/></svg>
+                        <h3>AI Retouch & Edit</h3>
+                        <p>Upload an image to modify, remove, or add elements.</p>
+                    </button>
+                </div>
+            </div>
+
+            <div id="workflow-content">
                 <div id="original-image-container" class="card">
-                    <h2>1. Upload Your Product Image</h2>
+                    <h2 id="uploader-title">1. Upload Your Product Image</h2>
                     <div id="original-image-preview" class="image-preview-box">
                          <div class="upload-instructions">
                             <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
                             <p>Drag & drop an image here</p>
                             <span class="upload-or">or</span>
-                            <button id="upload-btn" class="action-button">Select Image</button>
+                            <div class="upload-buttons-container">
+                                <button id="upload-btn" class="action-button">Select Image</button>
+                                <button id="camera-btn" class="action-button">Use Camera</button>
+                            </div>
+                        </div>
+                        <div id="camera-view" class="hidden">
+                            <video id="camera-stream" autoplay playsinline muted></video>
+                            <div class="camera-controls">
+                                <button id="capture-btn" class="action-button">Capture</button>
+                                <button id="cancel-camera-btn" class="action-button secondary">Cancel</button>
+                            </div>
                         </div>
                     </div>
                     <input type="file" id="file-upload" accept="image/*" class="hidden">
+                    <div id="ai-retouch-actions" class="hidden">
+                         <button id="start-editing-btn" class="action-button">Start Editing with AI</button>
+                    </div>
                 </div>
-                <div id="controls" class="card">
-                    <h2>2. Describe the Scene</h2>
-                    
-                    <div id="prompt-input-container">
-                        <textarea id="prompt-input" placeholder="e.g., A professional studio shot of the product on a marble slab, with soft side lighting..." maxlength="500"></textarea>
-                        <div class="prompt-controls">
-                            <button id="clear-prompt-btn" class="text-button">Clear</button>
-                            <span id="char-counter">0 / 500</span>
-                        </div>
-                    </div>
 
-                    <div id="auto-suggestions-container">
-                        <!-- Auto-suggestion tags will be dynamically added here -->
-                    </div>
-                    
-                    <div id="style-starters-container">
-                        <h3>Style Starters</h3>
-                        <div id="style-starters">
-                            <button class="style-btn" data-prompt="A lifestyle shot of the product in a real-world setting, such as a kitchen counter or a coffee table, with soft, natural lighting.">
-                                <div class="style-preview">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 16 4-4 6 6 8-8"/><circle cx="10" cy="8" r="2"/><path d="M21 13V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8"/></svg>
-                                </div>
-                                <span>Lifestyle</span>
-                            </button>
-                            <button class="style-btn" data-prompt="A clean, professional studio shot of the product against a solid, neutral background with bright, even lighting.">
-                                 <div class="style-preview">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M12 8v8"/><path d="m8.5 14 7-4"/><path d="m8.5 10 7 4"/></svg>
-                                </div>
-                                <span>Studio</span>
-                            </button>
-                            <button class="style-btn" data-prompt="The product featured against a simple, minimalist background with a focus on form and color.">
-                                <div class="style-preview">
-                                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M8 12h8"/></svg>
-                                </div>
-                                <span>Minimalist</span>
-                            </button>
-                             <button class="style-btn" data-prompt="The product placed on a vibrant, smooth gradient background that complements its colors.">
-                               <div class="style-preview">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><defs><linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:currentColor;stop-opacity:0.5" /><stop offset="100%" style="stop-color:currentColor;stop-opacity:1" /></linearGradient></defs><rect width="18" height="18" x="3" y="3" rx="2" fill="url(#grad1)"/></svg>
-                                </div>
-                                <span>Gradient</span>
-                            </button>
-                            <button class="style-btn" data-prompt="The product set against a dynamic, abstract pattern background featuring geometric shapes and bold colors.">
-                                 <div class="style-preview">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="m3.27 6.96 8.73 5.05 8.73-5.05"/><path d="m12 22.08V12"/></svg>
-                                </div>
-                                <span>Abstract</span>
-                            </button>
-                            <button class="style-btn" data-prompt="The product displayed on a realistic textured background, like wood, marble, or concrete, to give it a tactile feel.">
-                                <div class="style-preview">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.25 2.043c.47-.235 1.03-.235 1.5 0l7.5 3.75c.47.234.75.725.75 1.245v7.924c0 .52-.28.101-.75 1.245l-7.5 3.75c-.47.235-1.03.235-1.5 0l-7.5-3.75c-.47-.234-.75-.725-.75-1.245V7.038c0-.52.28-1.01.75-1.245z"/><path d="M3.5 6.5 12 11l8.5-4.5"/><path d="M3.5 17.5 12 13l8.5 4.5"/><path d="M12 22V11"/></svg>
-                                </div>
-                               <span>Textured</span>
-                            </button>
-                            <button class="style-btn" data-prompt="A hyper-realistic, photorealistic image of the product, emphasizing intricate details, textures, and lighting to make it look as real as possible.">
-                                <div class="style-preview">
-                                   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
-                                </div>
-                                <span>Photorealistic</span>
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <div id="negative-prompt-container">
-                        <h3>3. Things to Avoid (Optional)</h3>
-                         <input type="text" id="negative-prompt-input" placeholder="e.g., text, watermarks, people">
-                    </div>
-                    
-                    <div id="variations-container">
-                        <h3>4. Number of Variations</h3>
-                        <div class="slider-control">
-                            <input type="range" id="variations-slider" min="1" max="4" step="1" value="3">
-                            <span id="variations-value">3</span>
-                        </div>
-                    </div>
-
-                    <div id="artistic-style-container">
-                        <h3>5. Artistic Style</h3>
-                        <div id="artistic-style-selector">
-                            <button class="style-select-btn active" data-style="">None</button>
-                            <button class="style-select-btn" data-style="in a photorealistic style">Photorealistic</button>
-                            <button class="style-select-btn" data-style="in a vibrant cartoon style">Cartoon</button>
-                            <button class="style-select-btn" data-style="as a detailed oil painting">Oil Painting</button>
-                            <button class="style-select-btn" data-style="as a soft watercolor painting">Watercolor</button>
-                            <button class="style-select-btn" data-style="as a clean line art drawing">Line Art</button>
-                        </div>
-                    </div>
-
-                    <div id="aspect-ratio-container">
-                        <h3>6. Aspect Ratio</h3>
-                        <div id="aspect-ratio-selector">
-                            <button class="aspect-ratio-btn active" data-ratio="1:1" aria-label="Social Media Post (1:1)">
-                                <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"></rect></svg>
-                                <span>Post (1:1)</span>
-                            </button>
-                            <button class="aspect-ratio-btn" data-ratio="4:5" aria-label="Portrait Post (4:5)">
-                                <svg viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"></rect></svg>
-                                <span>Portrait (4:5)</span>
-                            </button>
-                            <button class="aspect-ratio-btn" data-ratio="3:4" aria-label="Tall Portrait (3:4)">
-                                <svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"></rect></svg>
-                                <span>Tall (3:4)</span>
-                            </button>
-                            <button class="aspect-ratio-btn" data-ratio="9:16" aria-label="Story or Reel (9:16)">
-                                <svg viewBox="0 0 24 24"><rect x="6.5" y="2" width="11" height="20" rx="2"></rect></svg>
-                                <span>Story (9:16)</span>
-                            </button>
-                            <button class="aspect-ratio-btn" data-ratio="16:9" aria-label="Landscape Banner (16:9)">
-                                <svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"></rect></svg>
-                                <span>Banner (16:9)</span>
-                            </button>
-                        </div>
-                    </div>
-
-
-                    <button id="generate-btn" class="cta-button" disabled>Generate</button>
-                    <p id="usage-counter" class="usage-text"></p>
-                </div>
-            </div>
-
-            <div id="image-toolkit-container" class="card hidden">
-                <div class="toolkit-header">
-                    <h2>Image Toolkit</h2>
-                    <p>Apply a special effect to your uploaded image before generating variations.</p>
-                </div>
-                <div class="toolkit-main">
-                    <div id="toolkit-controls">
-                        <button id="magic-remover-btn" class="toolkit-btn" disabled>
-                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.5 2.5a2.5 2.5 0 0 1 3.5 3.5L8.5 17.5a2.5 2.5 0 0 1-3.5-3.5Z"/><path d="M12.5 7.5 16.5 11.5"/></svg>
-                            <span>Magic Remover</span>
-                        </button>
-                        <button id="blueprintify-btn" class="toolkit-btn" disabled>
-                           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
-                            <span>Blueprint-ify</span>
-                        </button>
-                         <button id="scene-creator-btn" class="toolkit-btn" disabled>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
-                            <span>Scene Creator</span>
-                        </button>
-                        <button id="copy-effect-btn" class="toolkit-btn" disabled>
-                           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="9" height="9" x="9" y="9" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                           <span>Copy Effect</span>
-                        </button>
-                        <input type="file" id="style-file-upload" accept="image/*" class="hidden">
-                        <div id="composition-grid-control">
-                            <button id="composition-grid-btn" class="toolkit-btn" disabled>
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/></svg>
-                                <span>Composition Grid</span>
-                            </button>
-                            <div class="slider-control hidden" id="grid-size-control">
-                                <label for="grid-size-slider">Grid Size</label>
-                                <input type="range" id="grid-size-slider" min="2" max="5" step="1" value="3">
-                                <span id="grid-size-value">3x3</span>
-                            </div>
-                            <div class="slider-control hidden" id="grid-thickness-control">
-                                <label for="grid-thickness-slider">Thickness</label>
-                                <input type="range" id="grid-thickness-slider" min="1" max="10" step="1" value="2">
-                                <span id="grid-thickness-value">2px</span>
+                <div class="controls-container">
+                    <div id="controls" class="card">
+                        <h2 id="controls-title">2. Describe the Scene</h2>
+                        
+                        <div id="prompt-input-container">
+                            <textarea id="prompt-input" placeholder="e.g., A professional studio shot of the product on a marble slab, with soft side lighting..." maxlength="500"></textarea>
+                            <div class="prompt-controls">
+                                <button id="clear-prompt-btn" class="text-button">Clear</button>
+                                <span id="char-counter">0 / 500</span>
                             </div>
                         </div>
-                    </div>
-                    <div id="toolkit-preview-container">
-                        <div class="placeholder">
-                             <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
-                            <span>Toolkit results will appear here</span>
+
+                        <div id="auto-suggestions-container">
+                            <!-- Auto-suggestion tags will be dynamically added here -->
                         </div>
-                        <img id="toolkit-preview-img" class="hidden" alt="Toolkit preview">
-                    </div>
-                    <div id="toolkit-actions">
-                        <button id="toolkit-download-btn" class="action-button" disabled>Download Result</button>
+                        
+                        <div id="style-starters-container">
+                            <h3>Style Starters</h3>
+                            <div id="style-starters">
+                                <button class="style-btn" data-prompt="A lifestyle shot of the product in a real-world setting, such as a kitchen counter or a coffee table, with soft, natural lighting.">
+                                    <div class="style-preview">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 16 4-4 6 6 8-8"/><circle cx="10" cy="8" r="2"/><path d="M21 13V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8"/></svg>
+                                    </div>
+                                    <span>Lifestyle</span>
+                                </button>
+                                <button class="style-btn" data-prompt="A clean, professional studio shot of the product against a solid, neutral background with bright, even lighting.">
+                                     <div class="style-preview">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M12 8v8"/><path d="m8.5 14 7-4"/><path d="m8.5 10 7 4"/></svg>
+                                    </div>
+                                    <span>Studio</span>
+                                </button>
+                                <button class="style-btn" data-prompt="The product featured against a simple, minimalist background with a focus on form and color.">
+                                    <div class="style-preview">
+                                       <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M8 12h8"/></svg>
+                                    </div>
+                                    <span>Minimalist</span>
+                                </button>
+                                 <button class="style-btn" data-prompt="The product placed on a vibrant, smooth gradient background that complements its colors.">
+                                   <div class="style-preview">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><defs><linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:currentColor;stop-opacity:0.5" /><stop offset="100%" style="stop-color:currentColor;stop-opacity:1" /></linearGradient></defs><rect width="18" height="18" x="3" y="3" rx="2" fill="url(#grad1)"/></svg>
+                                    </div>
+                                    <span>Gradient</span>
+                                </button>
+                                <button class="style-btn" data-prompt="The product set against a dynamic, abstract pattern background featuring geometric shapes and bold colors.">
+                                     <div class="style-preview">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="m3.27 6.96 8.73 5.05 8.73-5.05"/><path d="m12 22.08V12"/></svg>
+                                    </div>
+                                    <span>Abstract</span>
+                                </button>
+                                <button class="style-btn" data-prompt="The product displayed on a realistic textured background, like wood, marble, or concrete, to give it a tactile feel.">
+                                    <div class="style-preview">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.25 2.043c.47-.235 1.03-.235 1.5 0l7.5 3.75c.47.234.75.725.75 1.245v7.924c0 .52-.28.101-.75 1.245l-7.5 3.75c-.47.235-1.03.235-1.5 0l-7.5-3.75c-.47-.234-.75-.725-.75-1.245V7.038c0-.52.28-1.01.75-1.245z"/><path d="M3.5 6.5 12 11l8.5-4.5"/><path d="M3.5 17.5 12 13l8.5 4.5"/><path d="M12 22V11"/></svg>
+                                    </div>
+                                   <span>Textured</span>
+                                </button>
+                                <button class="style-btn" data-prompt="A hyper-realistic, photorealistic image of the product, emphasizing intricate details, textures, and lighting to make it look as real as possible.">
+                                    <div class="style-preview">
+                                       <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                                    </div>
+                                    <span>Photorealistic</span>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div id="negative-prompt-container">
+                            <h3>3. Things to Avoid (Optional)</h3>
+                             <input type="text" id="negative-prompt-input" placeholder="e.g., text, watermarks, people">
+                        </div>
+                        
+                        <div id="variations-container">
+                            <h3>4. Number of Variations</h3>
+                            <div class="slider-control">
+                                <input type="range" id="variations-slider" min="1" max="4" step="1" value="3">
+                                <span id="variations-value">3</span>
+                            </div>
+                        </div>
+
+                        <div id="artistic-style-container">
+                            <h3>5. Artistic Style</h3>
+                            <div id="artistic-style-selector">
+                                <button class="style-select-btn active" data-style="">None</button>
+                                <button class="style-select-btn" data-style="in a photorealistic style">Photorealistic</button>
+                                <button class="style-select-btn" data-style="in a vibrant cartoon style">Cartoon</button>
+                                <button class="style-select-btn" data-style="as a detailed oil painting">Oil Painting</button>
+                                <button class="style-select-btn" data-style="as a soft watercolor painting">Watercolor</button>
+                                <button class="style-select-btn" data-style="as a clean line art drawing">Line Art</button>
+                            </div>
+                        </div>
+
+                        <div id="aspect-ratio-container">
+                            <h3>6. Aspect Ratio</h3>
+                            <div id="aspect-ratio-selector">
+                                <button class="aspect-ratio-btn active" data-ratio="1:1" aria-label="Social Media Post (1:1)">
+                                    <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"></rect></svg>
+                                    <span>Post (1:1)</span>
+                                </button>
+                                <button class="aspect-ratio-btn" data-ratio="4:5" aria-label="Portrait Post (4:5)">
+                                    <svg viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"></rect></svg>
+                                    <span>Portrait (4:5)</span>
+                                </button>
+                                <button class="aspect-ratio-btn" data-ratio="3:4" aria-label="Tall Portrait (3:4)">
+                                    <svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"></rect></svg>
+                                    <span>Tall (3:4)</span>
+                                </button>
+                                <button class="aspect-ratio-btn" data-ratio="9:16" aria-label="Story or Reel (9:16)">
+                                    <svg viewBox="0 0 24 24"><rect x="6.5" y="2" width="11" height="20" rx="2"></rect></svg>
+                                    <span>Story (9:16)</span>
+                                </button>
+                                <button class="aspect-ratio-btn" data-ratio="16:9" aria-label="Landscape Banner (16:9)">
+                                    <svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"></rect></svg>
+                                    <span>Banner (16:9)</span>
+                                </button>
+                            </div>
+                        </div>
+
+
+                        <button id="generate-btn" class="cta-button" disabled>Generate</button>
+                        <p id="usage-counter" class="usage-text"></p>
                     </div>
                 </div>
-            </div>
 
-            <div id="results-container">
-                <div id="image-gallery">
-                    <!-- Generated images will appear here -->
+                <div id="image-toolkit-container" class="card hidden">
+                    <div class="toolkit-header">
+                        <h2>Image Toolkit</h2>
+                        <p>Apply a special effect to your uploaded image before generating variations.</p>
+                    </div>
+                    <div class="toolkit-main">
+                        <div id="toolkit-controls">
+                            <button id="enhance-lighting-btn" class="toolkit-btn" disabled>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v1m0 16v1M5.6 5.6l.7.7m12.1 12.1l.7.7M3 12h1m16 0h1M5.6 18.4l.7-.7m12.1-12.1l.7-.7"/><circle cx="12" cy="12" r="4"/></svg>
+                                <span>Enhance Lighting</span>
+                            </button>
+                            <button id="magic-remover-btn" class="toolkit-btn" disabled>
+                                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.5 2.5a2.5 2.5 0 0 1 3.5 3.5L8.5 17.5a2.5 2.5 0 0 1-3.5-3.5Z"/><path d="M12.5 7.5 16.5 11.5"/></svg>
+                                <span>Magic Remover</span>
+                            </button>
+                            <button id="blueprintify-btn" class="toolkit-btn" disabled>
+                               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+                                <span>Blueprint-ify</span>
+                            </button>
+                             <button id="scene-creator-btn" class="toolkit-btn" disabled>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                                <span>Scene Creator</span>
+                            </button>
+                            <button id="copy-effect-btn" class="toolkit-btn" disabled>
+                               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="9" height="9" x="9" y="9" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                               <span>Copy Effect</span>
+                            </button>
+                            <input type="file" id="style-file-upload" accept="image/*" class="hidden">
+                             <button id="object-detection-btn" class="toolkit-btn" disabled>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><rect width="10" height="10" x="7" y="7" rx="1"/></svg>
+                                <span>Detect Objects</span>
+                            </button>
+                            <div id="composition-grid-control">
+                                <button id="composition-grid-btn" class="toolkit-btn" disabled>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/></svg>
+                                    <span>Composition Grid</span>
+                                </button>
+                                <div class="slider-control hidden" id="grid-size-control">
+                                    <label for="grid-size-slider">Grid Size</label>
+                                    <input type="range" id="grid-size-slider" min="2" max="5" step="1" value="3">
+                                    <span id="grid-size-value">3x3</span>
+                                </div>
+                                <div class="slider-control hidden" id="grid-thickness-control">
+                                    <label for="grid-thickness-slider">Thickness</label>
+                                    <input type="range" id="grid-thickness-slider" min="1" max="10" step="1" value="2">
+                                    <span id="grid-thickness-value">2px</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="toolkit-preview-container">
+                            <div class="placeholder">
+                                 <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+                                <span>Toolkit results will appear here</span>
+                            </div>
+                            <img id="toolkit-preview-img" class="hidden" alt="Toolkit preview">
+                            <canvas id="object-detection-canvas" class="hidden"></canvas>
+                        </div>
+                        <div id="toolkit-actions">
+                            <button id="toolkit-download-btn" class="action-button" disabled>Download Result</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="results-container">
+                    <div id="image-gallery">
+                        <!-- Generated images will appear here -->
+                    </div>
                 </div>
             </div>
         </main>

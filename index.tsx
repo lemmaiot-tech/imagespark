@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { GoogleGenAI, Modality, GenerateContentResponse } from '@google/genai';
+import { GoogleGenAI, Modality, GenerateContentResponse, Type } from '@google/genai';
 
 // --- Inlined authManager ---
 const authManager = {
@@ -155,7 +155,18 @@ interface ImageFile {
   src: string;
 }
 
+interface DetectedObject {
+    label: string;
+    box: {
+        xMin: number;
+        yMin: number;
+        xMax: number;
+        yMax: number;
+    }
+}
+
 // --- State variables ---
+let currentWorkflow = 'place-in-scene';
 let uploadedImage: ImageFile | null = null;
 let selectedPrompt = '';
 let selectedStyle = '';
@@ -165,6 +176,8 @@ let editHistory: string[] = [];
 let historyIndex = -1;
 let gridSlices = 3;
 let gridLineThickness = 2;
+let mediaStream: MediaStream | null = null;
+
 
 // Masking tool state
 let isMaskingEnabled = false;
@@ -186,6 +199,13 @@ let initialPinchDistance = 0;
 
 
 // --- DOM element references ---
+const useCaseSelectorButtons = document.querySelectorAll('.use-case-btn');
+const originalImageContainer = document.getElementById('original-image-container');
+const controls = document.getElementById('controls');
+const uploaderTitle = document.getElementById('uploader-title');
+const controlsTitle = document.getElementById('controls-title');
+const aiRetouchActions = document.getElementById('ai-retouch-actions');
+const startEditingBtn = document.getElementById('start-editing-btn');
 const fileUploadInput = document.getElementById('file-upload') as HTMLInputElement;
 const uploadBtn = document.getElementById('upload-btn') as HTMLButtonElement;
 const generateBtn = document.getElementById('generate-btn') as HTMLButtonElement;
@@ -227,11 +247,13 @@ const aspectRatioSelector = document.getElementById('aspect-ratio-selector');
 
 // Image Toolkit elements
 const toolkitContainer = document.getElementById('image-toolkit-container');
+const enhanceLightingBtn = document.getElementById('enhance-lighting-btn') as HTMLButtonElement;
 const magicRemoverBtn = document.getElementById('magic-remover-btn') as HTMLButtonElement;
 const blueprintifyBtn = document.getElementById('blueprintify-btn') as HTMLButtonElement;
 const sceneCreatorBtn = document.getElementById('scene-creator-btn') as HTMLButtonElement;
 const compositionGridBtn = document.getElementById('composition-grid-btn') as HTMLButtonElement;
 const copyEffectBtn = document.getElementById('copy-effect-btn') as HTMLButtonElement;
+const objectDetectionBtn = document.getElementById('object-detection-btn') as HTMLButtonElement;
 const styleFileUploadInput = document.getElementById('style-file-upload') as HTMLInputElement;
 const toolkitPreviewContainer = document.getElementById('toolkit-preview-container');
 const toolkitPreviewPlaceholder = toolkitPreviewContainer?.querySelector('.placeholder');
@@ -243,6 +265,8 @@ const gridSizeValue = document.getElementById('grid-size-value');
 const gridThicknessControl = document.getElementById('grid-thickness-control');
 const gridThicknessSlider = document.getElementById('grid-thickness-slider') as HTMLInputElement;
 const gridThicknessValue = document.getElementById('grid-thickness-value');
+const detectionCanvas = document.getElementById('object-detection-canvas') as HTMLCanvasElement;
+const detectionCtx = detectionCanvas?.getContext('2d');
 
 
 // Masking tool elements
@@ -290,10 +314,19 @@ const emailInput = document.getElementById('email-input') as HTMLInputElement;
 const accountInfo = document.getElementById('account-info');
 const userEmailSpan = document.getElementById('user-email');
 
+// Camera elements
+const cameraBtn = document.getElementById('camera-btn') as HTMLButtonElement;
+const cameraView = document.getElementById('camera-view');
+const cameraStreamEl = document.getElementById('camera-stream') as HTMLVideoElement;
+const captureBtn = document.getElementById('capture-btn') as HTMLButtonElement;
+const cancelCameraBtn = document.getElementById('cancel-camera-btn') as HTMLButtonElement;
+
 
 // Initialize the Google AI client
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 const model = 'gemini-2.5-flash-image';
+const textModel = 'gemini-2.5-flash';
+
 
 const AUTO_SUGGESTION_KEYWORDS = [
   'photorealistic', 'hyperrealistic', '4K', '8K', 'cinematic lighting',
@@ -442,7 +475,7 @@ function useGeneratedAsInput(item: GalleryItem) {
         toolkitContainer.classList.remove('hidden');
         toolkitPreviewImg.classList.remove('hidden');
         toolkitPreviewPlaceholder.classList.add('hidden');
-        [magicRemoverBtn, blueprintifyBtn, sceneCreatorBtn, compositionGridBtn, copyEffectBtn].forEach(btn => {
+        [enhanceLightingBtn, magicRemoverBtn, blueprintifyBtn, sceneCreatorBtn, compositionGridBtn, copyEffectBtn, objectDetectionBtn].forEach(btn => {
             if (btn) btn.disabled = false;
         });
         toolkitDownloadBtn.disabled = true;
@@ -566,7 +599,11 @@ function updateUsageUI() {
     generateBtn.textContent = 'Daily limit reached';
   } else {
     generateBtn.textContent = 'Generate';
-    generateBtn.disabled = !uploadedImage || !selectedPrompt;
+    if (currentWorkflow === 'create-from-scratch') {
+        generateBtn.disabled = !selectedPrompt;
+    } else {
+        generateBtn.disabled = !uploadedImage || !selectedPrompt;
+    }
   }
 }
 
@@ -584,13 +621,24 @@ function fileToGenerativePart(file: File): Promise<ImageFile> {
   });
 }
 
+function clearDetections() {
+    if (!detectionCtx || !detectionCanvas || !objectDetectionBtn) return;
+    detectionCtx.clearRect(0, 0, detectionCanvas.width, detectionCanvas.height);
+    detectionCanvas.classList.add('hidden');
+    objectDetectionBtn.classList.remove('active');
+    
+    const icon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><rect width="10" height="10" x="7" y="7" rx="1"/></svg>`;
+    const text = `<span>Detect Objects</span>`;
+    objectDetectionBtn.innerHTML = icon + text;
+}
+
 function resetToolkit() {
     if (!toolkitContainer || !toolkitPreviewImg || !toolkitPreviewPlaceholder || !compositionGridBtn) return;
     toolkitContainer.classList.add('hidden');
     toolkitPreviewImg.classList.add('hidden');
     toolkitPreviewPlaceholder?.classList.remove('hidden');
     toolkitPreviewImg.src = '';
-    [magicRemoverBtn, blueprintifyBtn, sceneCreatorBtn, compositionGridBtn, copyEffectBtn, toolkitDownloadBtn].forEach(btn => {
+    [enhanceLightingBtn, magicRemoverBtn, blueprintifyBtn, sceneCreatorBtn, compositionGridBtn, copyEffectBtn, toolkitDownloadBtn, objectDetectionBtn].forEach(btn => {
         if (btn) btn.disabled = true;
     });
     compositionGridBtn.classList.remove('active');
@@ -599,6 +647,7 @@ function resetToolkit() {
         toolkitPreviewContainer.style.removeProperty('--grid-size');
         toolkitPreviewContainer.style.removeProperty('--grid-line-thickness');
     }
+    clearDetections();
 
     // Reset grid controls
     gridSizeControl?.classList.add('hidden');
@@ -612,19 +661,34 @@ function resetToolkit() {
     if (gridThicknessValue) gridThicknessValue.textContent = '2px';
 }
 
+function stopCamera() {
+    if (mediaStream) {
+        mediaStream.getTracks().forEach(track => track.stop());
+        mediaStream = null;
+    }
+    cameraView?.classList.add('hidden');
+    originalImagePreview?.querySelector('.upload-instructions')?.classList.remove('hidden');
+}
+
+
 function resetMainUploader() {
     uploadedImage = null;
+    stopCamera();
     if (originalImagePreview) {
       const uploadInstructions = `
         <div class="upload-instructions">
           <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
           <p>Drag & drop an image here</p>
           <span class="upload-or">or</span>
-          <button id="upload-btn" class="action-button">Select Image</button>
+          <div class="upload-buttons-container">
+            <button id="upload-btn" class="action-button">Select Image</button>
+            <button id="camera-btn" class="action-button">Use Camera</button>
+          </div>
         </div>`;
       originalImagePreview.innerHTML = uploadInstructions;
     }
     if (fileUploadInput) fileUploadInput.value = '';
+    aiRetouchActions?.classList.add('hidden');
 }
 
 function resetControlInputs() {
@@ -676,15 +740,19 @@ async function processFile(file: File) {
             toolkitPreviewImg.src = watermarkedSrc;
           }
       }).catch(console.error);
-
-      if (toolkitContainer && toolkitPreviewImg && toolkitPreviewPlaceholder) {
-        toolkitContainer.classList.remove('hidden');
-        toolkitPreviewImg.classList.remove('hidden');
-        toolkitPreviewPlaceholder.classList.add('hidden');
-        [magicRemoverBtn, blueprintifyBtn, sceneCreatorBtn, compositionGridBtn, copyEffectBtn].forEach(btn => {
-            if (btn) btn.disabled = false;
-        });
-        toolkitDownloadBtn.disabled = true;
+      
+      if (currentWorkflow === 'ai-retouch') {
+        aiRetouchActions?.classList.remove('hidden');
+      } else {
+        if (toolkitContainer && toolkitPreviewImg && toolkitPreviewPlaceholder) {
+            toolkitContainer.classList.remove('hidden');
+            toolkitPreviewImg.classList.remove('hidden');
+            toolkitPreviewPlaceholder.classList.add('hidden');
+            [enhanceLightingBtn, magicRemoverBtn, blueprintifyBtn, sceneCreatorBtn, compositionGridBtn, copyEffectBtn, objectDetectionBtn].forEach(btn => {
+                if (btn) btn.disabled = false;
+            });
+            toolkitDownloadBtn.disabled = true;
+        }
       }
       updateUsageUI();
     } catch (error) {
@@ -906,7 +974,7 @@ async function handleAiImageEdit() {
         const response: GenerateContentResponse = await ai.models.generateContent({
             model: 'gemini-2.5-flash-image',
             contents: { parts: [{ inlineData: { data: base64Data, mimeType } }, { text: prompt }] },
-            config: { responseModalities: [Modality.IMAGE] },
+            config: { responseModalities: [Modality.IMAGE, Modality.TEXT] },
         });
 
         const imagePart = response.candidates?.[0]?.content?.parts.find(p => p.inlineData);
@@ -947,92 +1015,97 @@ async function handleAiImageEdit() {
 }
 
 async function handleGenerateClick() {
-  if (!usageManager.canGenerate()) {
-    alert(`You have reached your daily generation limit of ${usageManager.getDailyLimit()}. Please try again tomorrow.`);
-    return updateUsageUI();
-  }
-  if (!uploadedImage || !imageGallery || !selectedPrompt) return;
+    if (!usageManager.canGenerate()) {
+        alert(`You have reached your daily generation limit of ${usageManager.getDailyLimit()}. Please try again tomorrow.`);
+        return updateUsageUI();
+    }
+    
+    const isTextToImage = currentWorkflow === 'create-from-scratch';
+    if (!isTextToImage && !uploadedImage) return;
+    if (!selectedPrompt || !imageGallery) return;
 
-  generateBtn.disabled = true;
-  generateBtn.textContent = `Generating ${numberOfVariations} image${numberOfVariations > 1 ? 's' : ''}...`;
-  usageManager.recordGeneration();
+    generateBtn.disabled = true;
+    generateBtn.textContent = `Generating ${numberOfVariations} image${numberOfVariations > 1 ? 's' : ''}...`;
+    usageManager.recordGeneration();
 
-  imageGallery.querySelectorAll('.placeholder-wrapper.error').forEach(el => el.remove());
+    imageGallery.querySelectorAll('.placeholder-wrapper.error').forEach(el => el.remove());
 
-  const placeholders = Array.from({ length: numberOfVariations }, () => {
-    const el = createPlaceholderElement();
-    imageGallery.prepend(el);
-    return el;
-  });
-
-  try {
-    const generationPromises = Array.from({ length: numberOfVariations }, () => {
-        const parts: ({ text: string } | { inlineData: { data: string; mimeType: string; } })[] = [
-            { inlineData: { data: uploadedImage.base64, mimeType: uploadedImage.mimeType } }
-        ];
-
-        let promptParts = [`Fulfill this request: "${selectedPrompt}"`];
-        if (selectedStyle) {
-            promptParts.push(selectedStyle);
-        }
-        let finalPrompt = promptParts.join(' ').trim() + '.';
-
-        const negativePrompt = negativePromptInput?.value.trim() || '';
-        if (negativePrompt) finalPrompt += ` Avoid the following elements: ${negativePrompt}.`;
-        const aspectRatioMap: { [key: string]: string } = {
-            '4:5': 'a portrait 4:5',
-            '3:4': 'a portrait 3:4',
-            '9:16': 'a portrait 9:16',
-            '16:9': 'a landscape 16:9',
-        };
-        if (selectedAspectRatio !== '1:1') {
-            finalPrompt += ` The final image must have ${aspectRatioMap[selectedAspectRatio]} aspect ratio.`;
-        }
-        parts.push({ text: finalPrompt });
-
-        return ai.models.generateContent({
-            model: model,
-            contents: { parts },
-            config: { responseModalities: [Modality.IMAGE, Modality.TEXT] },
-        });
+    const placeholders = Array.from({ length: numberOfVariations }, () => {
+        const el = createPlaceholderElement();
+        imageGallery.prepend(el);
+        return el;
     });
 
-    const results = await Promise.allSettled(generationPromises);
-    let imagesGenerated = 0;
+    try {
+        const generationPromises = Array.from({ length: numberOfVariations }, () => {
+            const parts: ({ text: string } | { inlineData: { data: string; mimeType: string; } })[] = [];
 
-    results.forEach((result, index) => {
-        const placeholder = placeholders[placeholders.length - 1 - index];
-        if (!placeholder) return;
-
-        if (result.status === 'fulfilled') {
-            const imagePart = result.value.candidates?.[0]?.content?.parts.find(p => p.inlineData);
-            if (imagePart?.inlineData) {
-                const imageUrl = `data:${imagePart.inlineData.mimeType || 'image/png'};base64,${imagePart.inlineData.data}`;
-                const galleryItem: GalleryItem = { src: imageUrl, prompt: selectedPrompt };
-                historyManager.addItemToHistory(galleryItem);
-                placeholder.replaceWith(createImageElement(galleryItem));
-                imagesGenerated++;
-            } else {
-                 updatePlaceholderWithError(placeholder, 'No image found.');
+            if (!isTextToImage && uploadedImage) {
+                 parts.push({ inlineData: { data: uploadedImage.base64, mimeType: uploadedImage.mimeType } });
             }
-        } else {
-            console.error("A generation promise failed:", result.reason);
-            updatePlaceholderWithError(placeholder, 'Generation failed.');
-        }
-    });
 
-    if (imagesGenerated === 0) alert("Failed to generate any images. Please try a different prompt or style.");
+            let promptParts = [`Fulfill this request: "${selectedPrompt}"`];
+            if (selectedStyle) {
+                promptParts.push(selectedStyle);
+            }
+            let finalPrompt = promptParts.join(' ').trim() + '.';
 
-  } catch (error) {
-    console.error("Error generating images:", error);
-    alert("An unexpected error occurred. Please try again.");
-    placeholders.forEach(p => p.remove());
-  } finally {
-    resetMainUploader();
-    resetToolkit();
-    resetControlInputs();
-    updateUsageUI();
-  }
+            const negativePrompt = negativePromptInput?.value.trim() || '';
+            if (negativePrompt) finalPrompt += ` Avoid the following elements: ${negativePrompt}.`;
+            const aspectRatioMap: { [key: string]: string } = {
+                '4:5': 'a portrait 4:5',
+                '3:4': 'a portrait 3:4',
+                '9:16': 'a portrait 9:16',
+                '16:9': 'a landscape 16:9',
+            };
+            if (selectedAspectRatio !== '1:1') {
+                finalPrompt += ` The final image must have ${aspectRatioMap[selectedAspectRatio]} aspect ratio.`;
+            }
+            parts.push({ text: finalPrompt });
+
+            return ai.models.generateContent({
+                model: model,
+                contents: { parts },
+                config: { responseModalities: [Modality.IMAGE, Modality.TEXT] },
+            });
+        });
+
+        const results = await Promise.allSettled(generationPromises);
+        let imagesGenerated = 0;
+
+        results.forEach((result, index) => {
+            const placeholder = placeholders[placeholders.length - 1 - index];
+            if (!placeholder) return;
+
+            if (result.status === 'fulfilled') {
+                const imagePart = result.value.candidates?.[0]?.content?.parts.find(p => p.inlineData);
+                if (imagePart?.inlineData) {
+                    const imageUrl = `data:${imagePart.inlineData.mimeType || 'image/png'};base64,${imagePart.inlineData.data}`;
+                    const galleryItem: GalleryItem = { src: imageUrl, prompt: selectedPrompt };
+                    historyManager.addItemToHistory(galleryItem);
+                    placeholder.replaceWith(createImageElement(galleryItem));
+                    imagesGenerated++;
+                } else {
+                     updatePlaceholderWithError(placeholder, 'No image found.');
+                }
+            } else {
+                console.error("A generation promise failed:", result.reason);
+                updatePlaceholderWithError(placeholder, 'Generation failed.');
+            }
+        });
+
+        if (imagesGenerated === 0) alert("Failed to generate any images. Please try a different prompt or style.");
+
+    } catch (error) {
+        console.error("Error generating images:", error);
+        alert("An unexpected error occurred. Please try again.");
+        placeholders.forEach(p => p.remove());
+    } finally {
+        resetMainUploader();
+        resetToolkit();
+        resetControlInputs();
+        updateUsageUI();
+    }
 }
 
 function setTheme(theme: string) {
@@ -1044,6 +1117,50 @@ function setTheme(theme: string) {
 function loadTheme() {
     setTheme(localStorage.getItem('theme') || 'dark');
 }
+
+function setWorkflow(newWorkflow: string) {
+    currentWorkflow = newWorkflow;
+
+    // Update button active states
+    useCaseSelectorButtons.forEach(btn => {
+        const button = btn as HTMLButtonElement;
+        button.classList.toggle('active', button.dataset.workflow === newWorkflow);
+    });
+
+    // Reset UI elements before setting the new state
+    originalImageContainer?.classList.remove('hidden');
+    controls?.classList.remove('hidden');
+    aiRetouchActions?.classList.add('hidden');
+    generateBtn?.parentElement?.classList.remove('hidden'); // Show generate button container
+    usageCounter?.classList.remove('hidden');
+    
+    // Reset inputs and previews
+    resetMainUploader();
+    resetToolkit();
+    resetControlInputs();
+
+    switch (newWorkflow) {
+        case 'place-in-scene':
+            originalImageContainer?.classList.remove('hidden');
+            if (uploaderTitle) uploaderTitle.textContent = '1. Upload Your Product Image';
+            if (controlsTitle) controlsTitle.textContent = '2. Describe the Scene';
+            break;
+        case 'create-from-scratch':
+            originalImageContainer?.classList.add('hidden');
+            if (controlsTitle) controlsTitle.textContent = '1. Describe Your Product';
+            toolkitContainer?.classList.add('hidden'); 
+            break;
+        case 'ai-retouch':
+            originalImageContainer?.classList.remove('hidden');
+            controls?.classList.add('hidden');
+            if (uploaderTitle) uploaderTitle.textContent = '1. Upload Image to Retouch';
+            generateBtn?.parentElement?.classList.add('hidden'); // Hide main generate button
+            usageCounter?.classList.add('hidden');
+            break;
+    }
+    updateUsageUI();
+}
+
 
 function updateFilter(type: string, value: string) {
     if (!modalImageFiltered) return;
@@ -1471,20 +1588,171 @@ function initAuth() {
     updateUsageUI();
 }
 
+// --- Object Detection Functions ---
+function drawDetections(objects: DetectedObject[]) {
+    if (!detectionCtx || !toolkitPreviewContainer || !toolkitPreviewImg || !detectionCanvas) return;
+
+    // Match canvas dimensions to the container to overlay correctly
+    const containerRect = toolkitPreviewContainer.getBoundingClientRect();
+    detectionCanvas.width = containerRect.width;
+    detectionCanvas.height = containerRect.height;
+    detectionCanvas.classList.remove('hidden');
+
+    // Calculate the rendered image's position and size within the container
+    const imageRect = toolkitPreviewImg.getBoundingClientRect();
+    const offsetX = imageRect.left - containerRect.left;
+    const offsetY = imageRect.top - containerRect.top;
+    const imageRenderedWidth = imageRect.width;
+    const imageRenderedHeight = imageRect.height;
+
+    detectionCtx.clearRect(0, 0, detectionCanvas.width, detectionCanvas.height);
+    detectionCtx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent-color');
+    detectionCtx.lineWidth = 2;
+    detectionCtx.font = '14px ' + getComputedStyle(document.body).fontFamily;
+
+    objects.forEach(({ label, box }) => {
+        const x = offsetX + (box.xMin * imageRenderedWidth);
+        const y = offsetY + (box.yMin * imageRenderedHeight);
+        const w = (box.xMax - box.xMin) * imageRenderedWidth;
+        const h = (box.yMax - box.yMin) * imageRenderedHeight;
+
+        // Draw bounding box
+        detectionCtx.strokeRect(x, y, w, h);
+
+        // Draw label
+        const text = label;
+        const textMetrics = detectionCtx.measureText(text);
+        const textWidth = textMetrics.width;
+        const textHeight = 14; 
+        
+        detectionCtx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent-color');
+        detectionCtx.fillRect(x, y - textHeight - 4, textWidth + 8, textHeight + 4);
+        
+        detectionCtx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--cta-text-color');
+        detectionCtx.fillText(text, x + 4, y - 4);
+    });
+}
+
+async function handleObjectDetection() {
+    if (!uploadedImage || !objectDetectionBtn) return alert("Please upload an image first.");
+    if (objectDetectionBtn.classList.contains('active')) {
+        clearDetections();
+        return;
+    }
+    if (!usageManager.canGenerate()) return alert("You've reached your daily generation limit.");
+
+    const originalButtonContent = objectDetectionBtn.innerHTML;
+    objectDetectionBtn.disabled = true;
+    objectDetectionBtn.innerHTML = '<div class="spinner"></div><span>Detecting...</span>';
+
+    try {
+        usageManager.recordGeneration();
+        updateUsageUI();
+
+        const prompt = "Detect all prominent objects in this image. For each object, provide its name and a normalized bounding box (xMin, yMin, xMax, yMax).";
+        
+        const response = await ai.models.generateContent({
+            model: textModel,
+            contents: { parts: [
+                { inlineData: { data: uploadedImage.base64, mimeType: uploadedImage.mimeType } },
+                { text: prompt },
+            ]},
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        detections: {
+                            type: Type.ARRAY,
+                            items: {
+                                type: Type.OBJECT,
+                                properties: {
+                                    label: { type: Type.STRING, description: 'The identified object name.' },
+                                    box: {
+                                        type: Type.OBJECT,
+                                        properties: {
+                                            xMin: { type: Type.NUMBER }, yMin: { type: Type.NUMBER },
+                                            xMax: { type: Type.NUMBER }, yMax: { type: Type.NUMBER }
+                                        },
+                                        required: ['xMin', 'yMin', 'xMax', 'yMax']
+                                    }
+                                },
+                                required: ['label', 'box']
+                            }
+                        }
+                    },
+                    required: ['detections']
+                },
+            },
+        });
+        
+        const result = JSON.parse(response.text);
+        const detectedObjects = result.detections as DetectedObject[];
+
+        if (detectedObjects && detectedObjects.length > 0) {
+            drawDetections(detectedObjects);
+            objectDetectionBtn.classList.add('active');
+            objectDetectionBtn.innerHTML = `<span>Clear Detections</span>`;
+        } else {
+            alert("No objects were detected in the image.");
+            objectDetectionBtn.innerHTML = originalButtonContent;
+        }
+
+    } catch (error) {
+        console.error("Object detection failed:", error);
+        alert("Sorry, object detection could not be performed. Please try again.");
+        objectDetectionBtn.innerHTML = originalButtonContent;
+    } finally {
+        objectDetectionBtn.disabled = false;
+    }
+}
+
+
 document.addEventListener('DOMContentLoaded', () => {
   loadTheme();
   initAuth();
+  setWorkflow(currentWorkflow);
+
+  useCaseSelectorButtons.forEach(button => {
+    button.addEventListener('click', () => {
+        const workflow = (button as HTMLButtonElement).dataset.workflow;
+        if (workflow) {
+            setWorkflow(workflow);
+        }
+    });
+  });
+
+  // Event delegation for dynamically added upload/camera buttons
+  document.body.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    if (target.id === 'upload-btn') {
+        fileUploadInput?.click();
+    }
+    if (target.id === 'camera-btn') {
+        startCamera();
+    }
+  });
 
   const uploadArea = document.getElementById('original-image-preview');
   if (uploadArea) {
-      uploadArea.addEventListener('click', () => {
-          // Only trigger the file input if the upload instructions are present.
-          // This prevents re-triggering the upload when an image preview is already shown.
-          if (uploadArea.querySelector('.upload-instructions')) {
+      // Allow clicking the general area (but not the button itself) to open file dialog
+      uploadArea.addEventListener('click', (e) => {
+          if (uploadArea.querySelector('.upload-instructions') && !(e.target as HTMLElement).closest('button')) {
               fileUploadInput?.click();
           }
       });
   }
+
+  if (startEditingBtn) {
+    startEditingBtn.addEventListener('click', () => {
+        if(uploadedImage) {
+            applyWatermark(uploadedImage.src).then(watermarkedSrc => {
+                openEditModal(watermarkedSrc, uploadedImage.src);
+            }).catch(console.error);
+        }
+    });
+  }
+
 
   if (fileUploadInput) fileUploadInput.addEventListener('change', handleFileChange);
   if (generateBtn) generateBtn.addEventListener('click', handleGenerateClick);
@@ -1596,9 +1864,11 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Image Toolkit Logic
+  if (enhanceLightingBtn) enhanceLightingBtn.addEventListener('click', () => applyToolkitAIEffect(enhanceLightingBtn, "Analyze the lighting in this product image. Intelligently enhance it to create a professional, high-quality look. Improve highlights, balance shadows, and increase overall brightness and appeal without making it look unnatural or altering the product's colors. The goal is a professional studio lighting effect."));
   if (magicRemoverBtn) magicRemoverBtn.addEventListener('click', () => applyToolkitAIEffect(magicRemoverBtn, 'Remove the background from this image, leaving only the main subject against a transparent background.'));
   if (blueprintifyBtn) blueprintifyBtn.addEventListener('click', () => applyToolkitAIEffect(blueprintifyBtn, 'Transform this image into a detailed technical blueprint schematic. The background should be blue, and the subject\'s lines should be white. Include fictional annotations and dimensions for a realistic blueprint effect.'));
   if (sceneCreatorBtn) sceneCreatorBtn.addEventListener('click', openSceneCreatorModal);
+  if (objectDetectionBtn) objectDetectionBtn.addEventListener('click', handleObjectDetection);
   
   compositionGridBtn?.addEventListener('click', () => {
       const isActive = compositionGridBtn.classList.toggle('active');
@@ -1873,6 +2143,39 @@ document.addEventListener('DOMContentLoaded', () => {
           accountModal?.classList.add('hidden');
           emailInput.value = '';
       }
+  });
+
+  // Camera Logic
+  const startCamera = async () => {
+    try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        if (cameraView && cameraStreamEl) {
+            cameraView.classList.remove('hidden');
+            originalImagePreview?.querySelector('.upload-instructions')?.classList.add('hidden');
+            cameraStreamEl.srcObject = mediaStream;
+        }
+    } catch (err) {
+        console.error("Error accessing camera:", err);
+        alert("Could not access the camera. Please ensure you have granted permission.");
+        stopCamera();
+    }
+  };
+
+  cancelCameraBtn?.addEventListener('click', stopCamera);
+  captureBtn?.addEventListener('click', () => {
+    if (!mediaStream || !cameraStreamEl) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = cameraStreamEl.videoWidth;
+    canvas.height = cameraStreamEl.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx?.drawImage(cameraStreamEl, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob(async (blob) => {
+        if (blob) {
+            const file = new File([blob], 'camera-capture.jpg', { type: 'image/jpeg' });
+            await processFile(file);
+        }
+        stopCamera();
+    }, 'image/jpeg');
   });
 
 
